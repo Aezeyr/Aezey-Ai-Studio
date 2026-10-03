@@ -65,7 +65,7 @@ app.get('/api/health', (req, res) => {
     tagline: 'AI-Powered Content Creation for Smarter Social Media',
     version: '1.0.0',
     hasApiKey: hasKey,
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.1-flash-lite',
   });
 });
 
