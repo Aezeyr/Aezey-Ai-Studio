@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 160" fill="none">
+  <defs>
+    <linearGradient id="logo_blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E40AF"/>
+      <stop offset="50%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#0284C7"/>
+    </linearGradient>
+    <linearGradient id="logo_cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284C7"/>
+      <stop offset="100%" stop-color="#00F0FF"/>
+    </linearGradient>
+    <linearGradient id="logo_dark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A1931"/>
+      <stop offset="100%" stop-color="#1E3A8A"/>
+    </linearGradient>
+    <linearGradient id="text_dark" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0A1128"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <filter id="logo_glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00D2FF" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Left Icon Mark (scaled and positioned) -->
+  <g transform="translate(10, 15) scale(1.15)">
+    <!-- Dark Fold Base -->
+    <path d="M52 14 L20 85 C17 92 21 99 29 99 L38 99 L60 48 L46 22 Z" fill="url(#logo_dark)"/>
+    <!-- Outer Highlight -->
+    <path d="M52 14 L20 85 C18 90 22 95 27 95 L34 95 L58 42 Z" fill="url(#logo_blue)"/>
+    <!-- Right Fold -->
+    <path d="M52 14 L78 72 C81 78 77 86 70 88 L52 92 L62 70 L48 40 Z" fill="url(#logo_blue)"/>
+    <!-- Bottom Base -->
+    <path d="M40 85 L76 85 L84 97 L36 97 Z" fill="url(#logo_blue)"/>
+    <!-- Glowing Cyan Wing -->
+    <path d="M48 78 L68 78 L60 96 C50 94 44 88 48 78 Z" fill="url(#logo_cyan)" filter="url(#logo_glow)"/>
+
+    <!-- Circuit Lines & Nodes -->
+    <path d="M66 50 L84 50 L92 42 L102 42" stroke="#00F0FF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="104" cy="42" r="3.5" fill="#00F0FF" filter="url(#logo_glow)"/>
+
+    <path d="M70 60 L90 60 L98 56 L108 56" stroke="#38BDF8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="110" cy="56" r="3.5" fill="#38BDF8"/>
+
+    <path d="M68 68 L86 68 L94 76 L104 76" stroke="#0284C7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="106" cy="76" r="3.5" fill="#0284C7"/>
+
+    <path d="M74 55 L82 55 L88 64 L96 64" stroke="#00D2FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="98" cy="64" r="2.5" fill="#00F0FF"/>
+  </g>
+
+  <!-- Brand Typography: ΛEZEY -->
+  <g transform="translate(180, 20)">
+    <!-- Letter 'A' stylized chevron -->
+    <g transform="translate(0, 5)">
+      <!-- Left leg of A -->
+      <path d="M26 6 L6 62 L20 62 L32 25 L44 62 L58 62 L38 6 Z" fill="url(#text_dark)"/>
+      <!-- Inner cyan triangle accent -->
+      <path d="M32 38 L22 60 L42 60 Z" fill="url(#logo_cyan)"/>
+    </g>
+
+    <!-- Letter 'E' -->
+    <g transform="translate(68, 11)">
+      <path d="M0 0 L46 0 L46 12 L14 12 L14 22 L42 22 L42 34 L14 34 L14 44 L46 44 L46 56 L0 56 Z" fill="url(#text_dark)"/>
+    </g>
+
+    <!-- Letter 'Z' -->
+    <g transform="translate(126, 11)">
+      <path d="M0 0 L46 0 L46 12 L16 44 L46 44 L46 56 L0 56 L0 44 L30 12 L0 12 Z" fill="url(#text_dark)"/>
+    </g>
+
+    <!-- Letter 'E' -->
+    <g transform="translate(184, 11)">
+      <path d="M0 0 L46 0 L46 12 L14 12 L14 22 L42 22 L42 34 L14 34 L14 44 L46 44 L46 56 L0 56 Z" fill="url(#text_dark)"/>
+    </g>
+
+    <!-- Letter 'Y' -->
+    <g transform="translate(242, 11)">
+      <path d="M0 0 L15 0 L24 23 L33 0 L48 0 L31 34 L31 56 L17 56 L17 34 Z" fill="url(#logo_cyan)"/>
+    </g>
+
+    <!-- Subtitle: — AI Studio — -->
+    <g transform="translate(6, 88)">
+      <!-- Left cyan line -->
+      <line x1="0" y1="12" x2="38" y2="12" stroke="#00D2FF" stroke-width="3" stroke-linecap="round"/>
+      
+      <!-- 'AI Studio' text -->
+      <text x="50" y="20" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="700" letter-spacing="7" fill="url(#text_dark)">
+        AI Studio
+      </text>
+      
+      <!-- Right cyan line -->
+      <line x1="242" y1="12" x2="280" y2="12" stroke="#00D2FF" stroke-width="3" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

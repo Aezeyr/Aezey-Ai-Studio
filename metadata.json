@@ -1,0 +1,6 @@
+{
+  "name": "AEZEY AI Studio",
+  "description": "AI-Powered Content Creation for Smarter Social Media - Generate captions, hashtags, SEO keywords, and CTAs from images and short videos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
