@@ -7,11 +7,39 @@ import { createServer as createViteServer } from 'vite';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Payload limit setup for base64 media uploads
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  next();
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Dedicated error handler for JSON parsing and payload size issues
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    console.error('Invalid JSON payload received:', err.message);
+    return res.status(400).json({
+      success: false,
+      error: 'Malformed JSON payload. Please ensure the request body is valid JSON.',
+    });
+  }
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({
+      success: false,
+      error: 'Payload size exceeds the 50MB limit.',
+    });
+  }
+  next(err);
+});
 
 // Lazy initialization of GoogleGenAI
 let aiClient: GoogleGenAI | null = null;
@@ -37,12 +65,12 @@ app.get('/api/health', (req, res) => {
     tagline: 'AI-Powered Content Creation for Smarter Social Media',
     version: '1.0.0',
     hasApiKey: hasKey,
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.8-flash',
   });
 });
 
-// Analyze image or video endpoint
-app.post('/api/analyze', async (req, res) => {
+// Analyze image or video endpoint (supports both /api/analyze and /api/analyze/)
+app.post(['/api/analyze', '/api/analyze/'], async (req, res) => {
   try {
     const {
       mediaType,
@@ -204,8 +232,8 @@ Respond ONLY with valid JSON matching the schema provided.
       },
     };
 
-    // Valid Gemini Model Cascade
-    const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+    // Valid Gemini Model Cascade (gemini-3.8-flash -> gemini-3.1-flash-lite -> gemini-flash-latest)
+    const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
     let response: any = null;
     let lastError: any = null;
 
@@ -315,6 +343,24 @@ Respond ONLY with valid JSON matching the schema provided.
       error: error?.message || 'An unexpected error occurred while processing.',
     });
   }
+});
+
+// Explicitly reject non-POST requests to /api/analyze with 405 Method Not Allowed
+app.all(['/api/analyze', '/api/analyze/'], (req, res) => {
+  res.header('Allow', 'POST, OPTIONS');
+  return res.status(405).json({
+    success: false,
+    error: `Method ${req.method} Not Allowed. /api/analyze accepts POST requests only.`,
+    allowedMethods: ['POST', 'OPTIONS'],
+  });
+});
+
+// Catch-all for unhandled API routes to return JSON 404 instead of SPA HTML
+app.all('/api/*', (req, res) => {
+  return res.status(404).json({
+    success: false,
+    error: `API route ${req.method} ${req.path} not found.`,
+  });
 });
 
 // Vite middleware & Static serving

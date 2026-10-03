@@ -74,11 +74,25 @@ export default function App() {
       clearTimeout(stepTimer2);
       clearTimeout(stepTimer3);
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      let data: any = null;
 
-      if (!response.ok || !data.success) {
+      if (contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error('Server returned an invalid JSON response. Please check server logs.');
+        }
+      } else {
+        const textBody = await response.text();
         throw new Error(
-          data.error || 'Failed to analyze media content. Please verify your file and try again.'
+          `Server returned status ${response.status} (${response.statusText})${textBody ? `: ${textBody.slice(0, 150)}` : ''}`
+        );
+      }
+
+      if (!response.ok || !data?.success) {
+        throw new Error(
+          data?.error || `Request failed with status ${response.status}. Please verify your file and try again.`
         );
       }
 
