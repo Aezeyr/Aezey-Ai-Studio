@@ -22,6 +22,7 @@ import {
   validateImageFile,
   validateVideoFile,
   extractVideoKeyframes,
+  optimizeImageForAnalysis,
   fileToBase64,
   formatBytes,
   formatDuration,
@@ -167,9 +168,12 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
         if (mediaType === 'video') {
           // Extract keyframes for reliable visual multi-frame comprehension
           videoFrames = await extractVideoKeyframes(file, 5);
-          base64Data = await fileToBase64(file);
+          // Only send full raw video base64 if keyframe extraction was not possible
+          if (!videoFrames || videoFrames.length === 0) {
+            base64Data = await fileToBase64(file);
+          }
         } else {
-          base64Data = await fileToBase64(file);
+          base64Data = await optimizeImageForAnalysis(file);
         }
       } else if (previewUrl && previewUrl.startsWith('data:')) {
         base64Data = previewUrl;

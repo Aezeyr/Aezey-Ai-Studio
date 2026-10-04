@@ -32,6 +32,52 @@ export function fileToBase64(file: File | Blob): Promise<string> {
 }
 
 /**
+ * Optimizes high-resolution images for fast transmission and inference,
+ * keeping file size well within serverless and Cloudflare payload limits while preserving full clarity.
+ */
+export async function optimizeImageForAnalysis(file: File): Promise<string> {
+  // If small (< 1.5MB), directly convert
+  if (file.size <= 1.5 * 1024 * 1024) {
+    return fileToBase64(file);
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const maxDim = 2048;
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        resolve(dataUrl);
+      } else {
+        fileToBase64(file).then(resolve);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      fileToBase64(file).then(resolve);
+    };
+    img.src = objectUrl;
+  });
+}
+
+/**
  * Validates an image file
  */
 export function validateImageFile(file: File): MediaValidationResult {
