@@ -143,15 +143,29 @@ function formatTags(tags: string[]): string[] {
   return tags.map((t) => (t.startsWith('#') ? t : `#${t.replace(/\s+/g, '')}`));
 }
 
+export function resolveApiKey(providedKey?: string): string | undefined {
+  const candidate =
+    providedKey ||
+    (typeof process !== 'undefined' ? (process.env?.GEMINI_API_KEY || process.env?.GOOGLE_API_KEY) : undefined) ||
+    (typeof globalThis !== 'undefined'
+      ? ((globalThis as any).GEMINI_API_KEY || (globalThis as any).GOOGLE_API_KEY)
+      : undefined);
+
+  if (!candidate) return undefined;
+  // Clean potential surrounding quotes or extra whitespace
+  return candidate.trim().replace(/^["']|["']$/g, '');
+}
+
 /**
  * Unified Core Content Analyzer for AEZEY AI Studio.
  * Runs in Node.js (Express), Cloudflare Workers, and Cloudflare Pages Functions.
  */
 export async function analyzeContent(
   payload: MediaAnalysisPayload,
-  apiKey: string
+  apiKey?: string
 ): Promise<MediaAnalysisResult> {
-  if (!apiKey) {
+  const activeKey = resolveApiKey(apiKey);
+  if (!activeKey) {
     throw new Error('GEMINI_API_KEY is missing. Please configure it in your environment or secrets.');
   }
 
@@ -242,7 +256,14 @@ Respond ONLY with valid JSON matching the schema provided.
     responseSchema: RESPONSE_SCHEMA,
   };
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({
+    apiKey: activeKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
   let responseText: string | null = null;
   let lastError: any = null;
 
@@ -268,10 +289,13 @@ Respond ONLY with valid JSON matching the schema provided.
   if (!responseText) {
     for (const modelName of CANDIDATE_MODELS) {
       try {
-        const restUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+        const restUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${activeKey}`;
         const restRes = await fetch(restUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'aistudio-build',
+          },
           body: JSON.stringify({
             contents: [{ parts }],
             generationConfig: {
@@ -388,12 +412,13 @@ Respond ONLY with valid JSON matching the schema provided.
 }
 
 export function getHealthInfo(apiKey?: string) {
+  const resolved = resolveApiKey(apiKey);
   return {
     status: 'ok',
     brand: 'AEZEY AI Studio',
     tagline: 'AI-Powered Content Creation for Smarter Social Media',
     version: '1.0.0',
-    hasApiKey: Boolean(apiKey),
+    hasApiKey: Boolean(resolved),
     model: CANDIDATE_MODELS[0],
   };
 }

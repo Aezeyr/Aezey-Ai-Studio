@@ -1,4 +1,4 @@
-import { getHealthInfo } from '../../src/services/analyzer';
+import { getHealthInfo, resolveApiKey } from '../../src/services/analyzer';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -15,9 +15,7 @@ export async function onRequestOptions() {
 }
 
 export async function onRequestGet(context: { env: Record<string, string> }) {
-  const apiKey =
-    context.env?.GEMINI_API_KEY ||
-    (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined);
+  const apiKey = resolveApiKey(context.env?.GEMINI_API_KEY || context.env?.GOOGLE_API_KEY);
 
   return new Response(JSON.stringify(getHealthInfo(apiKey)), {
     status: 200,

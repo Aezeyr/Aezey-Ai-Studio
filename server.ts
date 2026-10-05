@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
-import { analyzeContent, getHealthInfo } from './src/services/analyzer';
+import { analyzeContent, getHealthInfo, resolveApiKey } from './src/services/analyzer';
 
 dotenv.config();
 
@@ -43,14 +43,13 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  res.json(getHealthInfo(apiKey));
+  res.json(getHealthInfo());
 });
 
 // Analyze image or video endpoint (supports both /api/analyze and /api/analyze/)
 app.post(['/api/analyze', '/api/analyze/'], async (req, res) => {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = resolveApiKey(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
     if (!apiKey) {
       return res.status(500).json({
         success: false,

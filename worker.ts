@@ -1,7 +1,8 @@
-import { analyzeContent, getHealthInfo, MediaAnalysisPayload } from './src/services/analyzer';
+import { analyzeContent, getHealthInfo, resolveApiKey, MediaAnalysisPayload } from './src/services/analyzer';
 
 export interface Env {
   GEMINI_API_KEY?: string;
+  GOOGLE_API_KEY?: string;
   ASSETS?: {
     fetch: (request: Request) => Promise<Response>;
   };
@@ -38,9 +39,15 @@ export default {
       });
     }
 
+    // Resolve active API key from Cloudflare worker env or process.env
+    const apiKey = resolveApiKey(env.GEMINI_API_KEY || env.GOOGLE_API_KEY);
+    // Sync process.env for runtime compatibility
+    if (apiKey && typeof process !== 'undefined' && process.env) {
+      process.env.GEMINI_API_KEY = apiKey;
+    }
+
     // Health check endpoint
     if (pathname === '/api/health' || pathname === '/api/health/') {
-      const apiKey = env.GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined);
       return jsonResponse(getHealthInfo(apiKey));
     }
 
@@ -58,7 +65,6 @@ export default {
         );
       }
 
-      const apiKey = env.GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined);
       if (!apiKey) {
         return jsonResponse(
           {
