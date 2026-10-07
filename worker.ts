@@ -40,7 +40,7 @@ export default {
     }
 
     // Resolve active API key from Cloudflare worker env or process.env
-    const apiKey = resolveApiKey(env.GEMINI_API_KEY || env.GOOGLE_API_KEY);
+    const apiKey = resolveApiKey(env.GEMINI_API_KEY || env.GOOGLE_API_KEY, env);
     // Sync process.env for runtime compatibility
     if (apiKey && typeof process !== 'undefined' && process.env) {
       process.env.GEMINI_API_KEY = apiKey;
@@ -48,7 +48,7 @@ export default {
 
     // Health check endpoint
     if (pathname === '/api/health' || pathname === '/api/health/') {
-      return jsonResponse(getHealthInfo(apiKey));
+      return jsonResponse(getHealthInfo(apiKey, env));
     }
 
     // Media analysis endpoint

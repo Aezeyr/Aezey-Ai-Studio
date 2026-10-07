@@ -15,9 +15,9 @@ export async function onRequestOptions() {
 }
 
 export async function onRequestGet(context: { env: Record<string, string> }) {
-  const apiKey = resolveApiKey(context.env?.GEMINI_API_KEY || context.env?.GOOGLE_API_KEY);
+  const apiKey = resolveApiKey(context.env?.GEMINI_API_KEY || context.env?.GOOGLE_API_KEY, context.env);
 
-  return new Response(JSON.stringify(getHealthInfo(apiKey)), {
+  return new Response(JSON.stringify(getHealthInfo(apiKey, context.env)), {
     status: 200,
     headers: {
       'Content-Type': 'application/json',

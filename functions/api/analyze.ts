@@ -16,7 +16,7 @@ export async function onRequestOptions() {
 
 export async function onRequestPost(context: { request: Request; env: Record<string, string> }) {
   const { request, env } = context;
-  const apiKey = resolveApiKey(env?.GEMINI_API_KEY || env?.GOOGLE_API_KEY);
+  const apiKey = resolveApiKey(env?.GEMINI_API_KEY || env?.GOOGLE_API_KEY, env);
   if (apiKey && typeof process !== 'undefined' && process.env) {
     process.env.GEMINI_API_KEY = apiKey;
   }

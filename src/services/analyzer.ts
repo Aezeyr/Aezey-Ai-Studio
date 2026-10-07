@@ -143,17 +143,75 @@ function formatTags(tags: string[]): string[] {
   return tags.map((t) => (t.startsWith('#') ? t : `#${t.replace(/\s+/g, '')}`));
 }
 
-export function resolveApiKey(providedKey?: string): string | undefined {
-  const candidate =
-    providedKey ||
-    (typeof process !== 'undefined' ? (process.env?.GEMINI_API_KEY || process.env?.GOOGLE_API_KEY) : undefined) ||
-    (typeof globalThis !== 'undefined'
-      ? ((globalThis as any).GEMINI_API_KEY || (globalThis as any).GOOGLE_API_KEY)
-      : undefined);
+export function resolveApiKey(providedKey?: string, envContext?: Record<string, any>): string | undefined {
+  if (providedKey && typeof providedKey === 'string' && providedKey.trim()) {
+    return providedKey.trim().replace(/^["']|["']$/g, '');
+  }
 
-  if (!candidate) return undefined;
-  // Clean potential surrounding quotes or extra whitespace
-  return candidate.trim().replace(/^["']|["']$/g, '');
+  // 1. Check passed envContext (Cloudflare Worker env or Pages context.env)
+  if (envContext && typeof envContext === 'object') {
+    const directKeys = [
+      'GEMINI_API_KEY',
+      'GOOGLE_API_KEY',
+      'API_KEY',
+      'GEMINI_KEY',
+      'GOOGLE_GENAI_API_KEY',
+      'VITE_GEMINI_API_KEY',
+    ];
+    for (const k of directKeys) {
+      if (typeof envContext[k] === 'string' && envContext[k].trim()) {
+        return envContext[k].trim().replace(/^["']|["']$/g, '');
+      }
+    }
+    // Scan case-insensitively across envContext keys
+    for (const [k, v] of Object.entries(envContext)) {
+      if (typeof v === 'string' && v.trim() && /gemini|google.*api.*key|^api_key$/i.test(k)) {
+        return v.trim().replace(/^["']|["']$/g, '');
+      }
+    }
+  }
+
+  // 2. Check process.env (Node.js Express / Local dev / Cloudflare nodejs_compat)
+  if (typeof process !== 'undefined' && process.env) {
+    const directKeys = [
+      'GEMINI_API_KEY',
+      'GOOGLE_API_KEY',
+      'API_KEY',
+      'GEMINI_KEY',
+      'GOOGLE_GENAI_API_KEY',
+      'VITE_GEMINI_API_KEY',
+    ];
+    for (const k of directKeys) {
+      const val = process.env[k];
+      if (typeof val === 'string' && val.trim()) {
+        return val.trim().replace(/^["']|["']$/g, '');
+      }
+    }
+    for (const [k, v] of Object.entries(process.env)) {
+      if (typeof v === 'string' && v.trim() && /gemini|google.*api.*key|^api_key$/i.test(k)) {
+        return v.trim().replace(/^["']|["']$/g, '');
+      }
+    }
+  }
+
+  // 3. Check globalThis
+  if (typeof globalThis !== 'undefined') {
+    const gt = globalThis as any;
+    const directKeys = [
+      'GEMINI_API_KEY',
+      'GOOGLE_API_KEY',
+      'API_KEY',
+      'GEMINI_KEY',
+      'GOOGLE_GENAI_API_KEY',
+    ];
+    for (const k of directKeys) {
+      if (typeof gt[k] === 'string' && gt[k].trim()) {
+        return gt[k].trim().replace(/^["']|["']$/g, '');
+      }
+    }
+  }
+
+  return undefined;
 }
 
 /**
@@ -289,11 +347,12 @@ Respond ONLY with valid JSON matching the schema provided.
   if (!responseText) {
     for (const modelName of CANDIDATE_MODELS) {
       try {
-        const restUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${activeKey}`;
+        const restUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(activeKey)}`;
         const restRes = await fetch(restUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'x-goog-api-key': activeKey,
             'User-Agent': 'aistudio-build',
           },
           body: JSON.stringify({
@@ -312,6 +371,14 @@ Respond ONLY with valid JSON matching the schema provided.
             responseText = textCandidate;
             break;
           }
+        } else {
+          const errBody = await restRes.text();
+          try {
+            const parsed = JSON.parse(errBody);
+            lastError = new Error(parsed?.error?.message || errBody);
+          } catch {
+            lastError = new Error(errBody);
+          }
         }
       } catch (restErr: any) {
         lastError = restErr;
@@ -320,6 +387,21 @@ Respond ONLY with valid JSON matching the schema provided.
   }
 
   if (!responseText) {
+    const rawErrMsg = String(lastError?.message || lastError || '');
+    if (
+      rawErrMsg.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') ||
+      rawErrMsg.includes('API_KEY_SERVICE_BLOCKED') ||
+      rawErrMsg.includes('UNAUTHENTICATED') ||
+      rawErrMsg.includes('invalid authentication')
+    ) {
+      throw new Error(
+        'Gemini API authentication failed (401 UNAUTHENTICATED: ACCESS_TOKEN_TYPE_UNSUPPORTED). ' +
+        'Please verify that in your Google Cloud Project: ' +
+        '(1) "Generative Language API" (generativelanguage.googleapis.com) is enabled; ' +
+        '(2) In APIs & Services -> Credentials -> Your API Key, ensure "API restrictions" allows "Generative Language API" or has no restrictive restrictions; ' +
+        '(3) The key was copied completely with the "AQ." prefix and without quotes.'
+      );
+    }
     throw lastError || new Error('All AI models were temporarily busy or unavailable. Please retry.');
   }
 
@@ -411,8 +493,8 @@ Respond ONLY with valid JSON matching the schema provided.
   return finalResult;
 }
 
-export function getHealthInfo(apiKey?: string) {
-  const resolved = resolveApiKey(apiKey);
+export function getHealthInfo(apiKey?: string, envContext?: Record<string, any>) {
+  const resolved = resolveApiKey(apiKey, envContext);
   return {
     status: 'ok',
     brand: 'AEZEY AI Studio',
