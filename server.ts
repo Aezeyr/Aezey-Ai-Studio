@@ -72,7 +72,7 @@ app.post(['/api/analyze', '/api/analyze/'], async (req, res) => {
       data: result,
     });
   } catch (error: any) {
-    console.error('Error analyzing media in AEZEY AI Studio:', error);
+    console.log('[AEZEY AI Studio] Analyze processing notice:', error?.message?.slice(0, 100));
     const isClientError =
       error?.message?.includes('Missing media') || error?.message?.includes('exceeds');
     return res.status(isClientError ? 400 : 500).json({

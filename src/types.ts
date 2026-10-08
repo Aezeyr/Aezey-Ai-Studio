@@ -73,6 +73,8 @@ export interface AnalysisResult {
   detectedContext: DetectedContext;
   platform?: TargetPlatform;
   tone?: ContentTone;
+  isSimulatedFallback?: boolean;
+  authNotice?: string;
 }
 
 export interface ApiResponse<T = any> {
