@@ -8,6 +8,8 @@ import {
   Layers,
   Flame,
   Globe,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { AezeyLogo } from './components/AezeyLogo';
 import { MediaUploader } from './components/MediaUploader';
@@ -260,10 +262,32 @@ export default function App() {
 
           {/* Error Display */}
           {errorMessage && (
-            <div className="mt-6 p-4 sm:p-5 rounded-2xl bg-red-950/70 border border-red-500/40 text-red-200">
-              <div className="space-y-1">
-                <p className="font-bold text-sm text-red-200">Processing Failed</p>
-                <p className="text-xs text-red-300 leading-relaxed">{errorMessage}</p>
+            <div className="mt-6 p-5 sm:p-6 rounded-2xl bg-red-950/80 border border-red-500/50 text-red-200 shadow-xl shadow-red-950/30">
+              <div className="flex items-start gap-3.5">
+                <div className="p-2 rounded-xl bg-red-900/60 border border-red-500/30 text-red-400 shrink-0 mt-0.5">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div className="space-y-2 flex-1">
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="font-bold text-sm text-red-100">
+                      {errorMessage.includes('401') || errorMessage.includes('API_KEY')
+                        ? 'Gemini API Authentication Required'
+                        : 'Analysis Failed'}
+                    </p>
+                    {lastPayload && !isAnalyzing && (
+                      <button
+                        onClick={() => handleStartAnalysis(lastPayload)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-800/80 hover:bg-red-700 text-white transition-colors border border-red-500/40"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Retry Analysis
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-red-200/90 leading-relaxed whitespace-pre-line">
+                    {errorMessage}
+                  </p>
+                </div>
               </div>
             </div>
           )}

@@ -347,8 +347,17 @@ Respond ONLY with valid JSON matching the schema provided.
   // Direct REST API fallback if SDK throws or is restricted
   if (!responseText) {
     for (const modelName of CANDIDATE_MODELS) {
+      const restPayload = JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: RESPONSE_SCHEMA,
+        },
+      });
+
+      // Try 1: REST with x-goog-api-key header (standard Google API pattern)
       try {
-        const restUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(activeKey)}`;
+        const restUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
         const restRes = await fetch(restUrl, {
           method: 'POST',
           headers: {
@@ -356,13 +365,7 @@ Respond ONLY with valid JSON matching the schema provided.
             'x-goog-api-key': activeKey,
             'User-Agent': 'aistudio-build',
           },
-          body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              responseSchema: RESPONSE_SCHEMA,
-            },
-          }),
+          body: restPayload,
         });
 
         if (restRes.ok) {
@@ -384,6 +387,77 @@ Respond ONLY with valid JSON matching the schema provided.
       } catch (restErr: any) {
         lastError = restErr;
       }
+
+      if (responseText) break;
+
+      // Try 2: REST with Authorization: Bearer (used for specific Google Cloud API keys)
+      try {
+        const restUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+        const restRes = await fetch(restUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${activeKey}`,
+            'User-Agent': 'aistudio-build',
+          },
+          body: restPayload,
+        });
+
+        if (restRes.ok) {
+          const restJson: any = await restRes.json();
+          const textCandidate = restJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (textCandidate) {
+            responseText = textCandidate;
+            break;
+          }
+        } else {
+          const errBody = await restRes.text();
+          try {
+            const parsed = JSON.parse(errBody);
+            lastError = new Error(parsed?.error?.message || errBody);
+          } catch {
+            lastError = new Error(errBody);
+          }
+        }
+      } catch (bearerErr: any) {
+        lastError = bearerErr;
+      }
+
+      if (responseText) break;
+
+      // Try 3: REST with ?key= query parameter only
+      try {
+        const restUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(activeKey)}`;
+        const restRes = await fetch(restUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'aistudio-build',
+          },
+          body: restPayload,
+        });
+
+        if (restRes.ok) {
+          const restJson: any = await restRes.json();
+          const textCandidate = restJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (textCandidate) {
+            responseText = textCandidate;
+            break;
+          }
+        } else {
+          const errBody = await restRes.text();
+          try {
+            const parsed = JSON.parse(errBody);
+            lastError = new Error(parsed?.error?.message || errBody);
+          } catch {
+            lastError = new Error(errBody);
+          }
+        }
+      } catch (paramErr: any) {
+        lastError = paramErr;
+      }
+
+      if (responseText) break;
     }
   }
 
@@ -396,11 +470,11 @@ Respond ONLY with valid JSON matching the schema provided.
       rawErrMsg.includes('invalid authentication')
     ) {
       throw new Error(
-        'Gemini API authentication failed (401 UNAUTHENTICATED: ACCESS_TOKEN_TYPE_UNSUPPORTED). ' +
-        'Please verify that in your Google Cloud Project: ' +
-        '(1) "Generative Language API" (generativelanguage.googleapis.com) is enabled; ' +
-        '(2) In APIs & Services -> Credentials -> Your API Key, ensure "API restrictions" allows "Generative Language API" or has no restrictive restrictions; ' +
-        '(3) The key was copied completely with the "AQ." prefix and without quotes.'
+        'Gemini API authentication failed (401 UNAUTHENTICATED: API_KEY_SERVICE_BLOCKED / ACCESS_TOKEN_TYPE_UNSUPPORTED). ' +
+        'Your API key was rejected by Google Cloud. To resolve this: ' +
+        '(1) In Google Cloud Console -> APIs & Services -> Enabled APIs: ensure "Generative Language API" (generativelanguage.googleapis.com) is enabled; ' +
+        '(2) In Google Cloud Console -> APIs & Services -> Credentials -> Click your API Key: under "API restrictions", select "Don\'t restrict key" OR explicitly allow "Generative Language API"; ' +
+        '(3) Alternatively, create a dedicated Gemini API key at Google AI Studio (aistudio.google.com/app/apikey) and configure it in your secrets.'
       );
     }
     throw lastError || new Error('All AI models were temporarily busy or unavailable. Please retry.');
