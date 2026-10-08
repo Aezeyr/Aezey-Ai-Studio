@@ -94,7 +94,7 @@ export default {
           {
             success: false,
             error:
-              'GEMINI_API_KEY is not configured on Cloudflare. Please set GEMINI_API_KEY in Cloudflare Worker Settings -> Variables and Secrets, or configure an API key in API Key Settings.',
+              'GEMINI_API_KEY is not configured on Cloudflare. Please set GEMINI_API_KEY in Cloudflare Worker Settings -> Variables and Secrets.',
           },
           500
         );

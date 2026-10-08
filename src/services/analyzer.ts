@@ -225,7 +225,7 @@ export async function analyzeContent(
 ): Promise<MediaAnalysisResult> {
   const activeKey = resolveApiKey(payload?.apiKey || apiKey);
   if (!activeKey) {
-    throw new Error('GEMINI_API_KEY is missing. Please configure it in your environment, secrets, or API Key Settings.');
+    throw new Error('GEMINI_API_KEY is missing. Please configure it in your server environment variables or secrets.');
   }
 
   const {

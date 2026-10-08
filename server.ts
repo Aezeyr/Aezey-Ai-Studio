@@ -62,7 +62,7 @@ app.post(['/api/analyze', '/api/analyze/'], async (req, res) => {
       return res.status(500).json({
         success: false,
         error:
-          'GEMINI_API_KEY is not configured on the server. Please ensure the API key is set in environment secrets or configured in API Key Settings.',
+          'GEMINI_API_KEY is not configured on the server. Please ensure the API key is set in environment secrets.',
       });
     }
 

@@ -51,7 +51,7 @@ export async function onRequestPost(context: { request: Request; env: Record<str
       JSON.stringify({
         success: false,
         error:
-          'GEMINI_API_KEY is not configured on Cloudflare. Please set GEMINI_API_KEY in Cloudflare Pages Settings -> Environment variables, or configure an API key in API Key Settings.',
+          'GEMINI_API_KEY is not configured on Cloudflare. Please set GEMINI_API_KEY in Cloudflare Pages Settings -> Environment variables.',
       }),
       {
         status: 500,
