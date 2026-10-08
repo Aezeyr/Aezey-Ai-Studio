@@ -9,6 +9,7 @@ export interface MediaAnalysisPayload {
   platform?: string;
   tone?: string;
   customInstructions?: string;
+  apiKey?: string;
 }
 
 export interface MediaAnalysisResult {
@@ -222,9 +223,9 @@ export async function analyzeContent(
   payload: MediaAnalysisPayload,
   apiKey?: string
 ): Promise<MediaAnalysisResult> {
-  const activeKey = resolveApiKey(apiKey);
+  const activeKey = resolveApiKey(payload?.apiKey || apiKey);
   if (!activeKey) {
-    throw new Error('GEMINI_API_KEY is missing. Please configure it in your environment or secrets.');
+    throw new Error('GEMINI_API_KEY is missing. Please configure it in your environment, secrets, or API Key Settings.');
   }
 
   const {

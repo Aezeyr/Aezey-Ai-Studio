@@ -16,24 +16,16 @@ export async function onRequestOptions() {
 
 export async function onRequestPost(context: { request: Request; env: Record<string, string> }) {
   const { request, env } = context;
-  const apiKey = resolveApiKey(env?.GEMINI_API_KEY || env?.GOOGLE_API_KEY, env);
-  if (apiKey && typeof process !== 'undefined' && process.env) {
-    process.env.GEMINI_API_KEY = apiKey;
+  const envApiKey = resolveApiKey(env?.GEMINI_API_KEY || env?.GOOGLE_API_KEY, env);
+  if (envApiKey && typeof process !== 'undefined' && process.env) {
+    process.env.GEMINI_API_KEY = envApiKey;
   }
 
-  if (!apiKey) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error:
-          'GEMINI_API_KEY is not configured on Cloudflare. Please set GEMINI_API_KEY in Cloudflare Pages Settings -> Environment variables.',
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-      }
-    );
-  }
+  const headerKey =
+    request.headers.get('x-goog-api-key') ||
+    (request.headers.get('Authorization')
+      ? request.headers.get('Authorization')!.replace(/^Bearer\s+/i, '')
+      : undefined);
 
   let payload: MediaAnalysisPayload;
   try {
@@ -51,8 +43,25 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     );
   }
 
+  const clientKey = payload?.apiKey || headerKey;
+  const activeKey = resolveApiKey(clientKey || envApiKey, env);
+
+  if (!activeKey) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error:
+          'GEMINI_API_KEY is not configured on Cloudflare. Please set GEMINI_API_KEY in Cloudflare Pages Settings -> Environment variables, or configure an API key in API Key Settings.',
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+      }
+    );
+  }
+
   try {
-    const result = await analyzeContent(payload, apiKey);
+    const result = await analyzeContent(payload, activeKey);
     return new Response(
       JSON.stringify({
         success: true,

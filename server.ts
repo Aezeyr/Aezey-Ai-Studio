@@ -43,18 +43,26 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json(getHealthInfo());
+  const queryKey = typeof req.query.apiKey === 'string' ? req.query.apiKey : undefined;
+  const headerKey =
+    (req.headers['x-goog-api-key'] as string) ||
+    (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '') : undefined);
+  res.json(getHealthInfo(queryKey || headerKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY));
 });
 
 // Analyze image or video endpoint (supports both /api/analyze and /api/analyze/)
 app.post(['/api/analyze', '/api/analyze/'], async (req, res) => {
   try {
-    const apiKey = resolveApiKey(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
+    const headerKey =
+      (req.headers['x-goog-api-key'] as string) ||
+      (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '') : undefined);
+    const clientKey = req.body?.apiKey || headerKey;
+    const apiKey = resolveApiKey(clientKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
     if (!apiKey) {
       return res.status(500).json({
         success: false,
         error:
-          'GEMINI_API_KEY is not configured on the server. Please ensure the API key is set in environment secrets.',
+          'GEMINI_API_KEY is not configured on the server. Please ensure the API key is set in environment secrets or configured in API Key Settings.',
       });
     }
 

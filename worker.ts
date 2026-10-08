@@ -46,9 +46,17 @@ export default {
       process.env.GEMINI_API_KEY = apiKey;
     }
 
+    const queryKey = url.searchParams.get('apiKey') || undefined;
+    const headerKey =
+      request.headers.get('x-goog-api-key') ||
+      (request.headers.get('Authorization')
+        ? request.headers.get('Authorization')!.replace(/^Bearer\s+/i, '')
+        : undefined);
+    const effectiveHealthKey = resolveApiKey(queryKey || headerKey || apiKey, env);
+
     // Health check endpoint
     if (pathname === '/api/health' || pathname === '/api/health/') {
-      return jsonResponse(getHealthInfo(apiKey, env));
+      return jsonResponse(getHealthInfo(effectiveHealthKey, env));
     }
 
     // Media analysis endpoint
@@ -65,17 +73,6 @@ export default {
         );
       }
 
-      if (!apiKey) {
-        return jsonResponse(
-          {
-            success: false,
-            error:
-              'GEMINI_API_KEY is not configured on Cloudflare. Please set GEMINI_API_KEY in Cloudflare Worker Settings -> Variables and Secrets.',
-          },
-          500
-        );
-      }
-
       let payload: MediaAnalysisPayload;
       try {
         payload = await request.json();
@@ -89,8 +86,22 @@ export default {
         );
       }
 
+      const clientKey = payload?.apiKey || headerKey;
+      const effectiveApiKey = resolveApiKey(clientKey || apiKey, env);
+
+      if (!effectiveApiKey) {
+        return jsonResponse(
+          {
+            success: false,
+            error:
+              'GEMINI_API_KEY is not configured on Cloudflare. Please set GEMINI_API_KEY in Cloudflare Worker Settings -> Variables and Secrets, or configure an API key in API Key Settings.',
+          },
+          500
+        );
+      }
+
       try {
-        const result = await analyzeContent(payload, apiKey);
+        const result = await analyzeContent(payload, effectiveApiKey);
         return jsonResponse({
           success: true,
           data: result,

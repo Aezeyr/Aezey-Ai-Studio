@@ -8,11 +8,13 @@ import {
   Layers,
   Flame,
   Globe,
+  Key,
 } from 'lucide-react';
 import { AezeyLogo } from './components/AezeyLogo';
 import { MediaUploader } from './components/MediaUploader';
 import { ResultsDisplay } from './components/ResultsDisplay';
 import { FeaturesShowcase } from './components/FeaturesShowcase';
+import { ApiKeyModal } from './components/ApiKeyModal';
 import { AnalysisResult, MediaType, TargetPlatform, ContentTone } from './types';
 
 export default function App() {
@@ -20,6 +22,38 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // In-app API Key Management (overrides or tests keys without redeploying)
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [customApiKey, setCustomApiKey] = useState<string>(() => {
+    try {
+      return localStorage.getItem('aezey_custom_api_key') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const handleSaveApiKey = (key: string) => {
+    setCustomApiKey(key);
+    try {
+      if (key) {
+        localStorage.setItem('aezey_custom_api_key', key);
+      } else {
+        localStorage.removeItem('aezey_custom_api_key');
+      }
+    } catch (e) {
+      console.warn('localStorage error:', e);
+    }
+  };
+
+  const handleClearApiKey = () => {
+    setCustomApiKey('');
+    try {
+      localStorage.removeItem('aezey_custom_api_key');
+    } catch (e) {
+      console.warn('localStorage error:', e);
+    }
+  };
 
   // Cached last request payload for 1-click regeneration
   const [lastPayload, setLastPayload] = useState<any | null>(null);
@@ -62,12 +96,18 @@ export default function App() {
         setAnalysisStep('Synthesizing captions, hashtags, SEO keywords, and CTAs...');
       }, 4200);
 
+      const requestPayload = {
+        ...payload,
+        apiKey: customApiKey || undefined,
+      };
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(customApiKey ? { 'x-goog-api-key': customApiKey } : {}),
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestPayload),
       });
 
       clearTimeout(stepTimer1);
@@ -153,6 +193,24 @@ export default function App() {
 
           {/* Right Status Badge & CTA */}
           <div className="flex items-center gap-3">
+            {/* API Key Settings Button */}
+            <button
+              onClick={() => setIsApiKeyModalOpen(true)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                customApiKey
+                  ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40 hover:bg-cyan-900/60'
+                  : 'bg-slate-900 text-slate-300 border-slate-700/80 hover:bg-slate-800'
+              }`}
+              title="Configure Gemini API Key"
+            >
+              <Key className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">
+                {customApiKey ? 'Custom Key' : 'API Key'}
+              </span>
+              <span className="sm:hidden">Key</span>
+              {customApiKey && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
+            </button>
+
             <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950/70 text-emerald-300 border border-emerald-500/30">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               Gemini 3.8 Flash Online
@@ -251,9 +309,25 @@ export default function App() {
 
           {/* Error Display */}
           {errorMessage && (
-            <div className="mt-6 p-4 rounded-xl bg-red-950/70 border border-red-500/40 text-red-200">
-              <p className="font-bold text-sm">Processing Failed</p>
-              <p className="text-xs mt-1 text-red-300">{errorMessage}</p>
+            <div className="mt-6 p-4 sm:p-5 rounded-2xl bg-red-950/70 border border-red-500/40 text-red-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="font-bold text-sm text-red-200">Processing Failed</p>
+                  <p className="text-xs text-red-300 leading-relaxed">{errorMessage}</p>
+                </div>
+                {(errorMessage.includes('authentication') ||
+                  errorMessage.includes('401') ||
+                  errorMessage.includes('UNAUTHENTICATED') ||
+                  errorMessage.includes('GEMINI_API_KEY')) && (
+                  <button
+                    onClick={() => setIsApiKeyModalOpen(true)}
+                    className="self-start sm:self-center shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/25 transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    Update / Configure API Key
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -349,6 +423,15 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* API Key Configuration Modal */}
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        currentKey={customApiKey}
+        onSaveKey={handleSaveApiKey}
+        onClearKey={handleClearApiKey}
+      />
     </div>
   );
 }
