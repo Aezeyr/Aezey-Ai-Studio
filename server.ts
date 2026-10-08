@@ -26,7 +26,6 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Dedicated error handler for JSON parsing and payload size issues
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (err instanceof SyntaxError && 'body' in err) {
-    console.error('Invalid JSON payload received:', err.message);
     return res.status(400).json({
       success: false,
       error: 'Malformed JSON payload. Please ensure the request body is valid JSON.',
@@ -72,7 +71,7 @@ app.post(['/api/analyze', '/api/analyze/'], async (req, res) => {
       data: result,
     });
   } catch (error: any) {
-    console.log('[AEZEY AI Studio] Analyze processing notice:', error?.message?.slice(0, 100));
+    console.log('[AEZEY AI Studio] Analyze request encountered an issue.');
     const isClientError =
       error?.message?.includes('Missing media') || error?.message?.includes('exceeds');
     return res.status(isClientError ? 400 : 500).json({

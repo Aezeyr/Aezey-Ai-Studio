@@ -46,8 +46,23 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
         setCopiedSection(null);
         setToastMessage(null);
       }, 3000);
-    } catch (err) {
-      console.error('Failed to copy to clipboard', err);
+    } catch {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setCopiedSection(label);
+        setToastMessage(`Copied ${label} to clipboard!`);
+        setTimeout(() => {
+          setCopiedSection(null);
+          setToastMessage(null);
+        }, 3000);
+      } catch {
+        // Fallback silently
+      }
     }
   };
 

@@ -116,7 +116,7 @@ export default function App() {
         });
       }, 300);
     } catch (err: any) {
-      console.warn('Analysis status notification:', err?.message?.slice(0, 80));
+      // Handled gracefully via state display
       setErrorMessage(
         err?.message ||
           'Connection error or analysis timeout. Please ensure the server has network access and retry.'
