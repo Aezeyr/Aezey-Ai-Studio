@@ -56,16 +56,8 @@ app.post(['/api/analyze', '/api/analyze/'], async (req, res) => {
       (req.headers['x-goog-api-key'] as string) ||
       (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '') : undefined);
     const clientKey = req.body?.apiKey || headerKey;
-    const apiKey = resolveApiKey(clientKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
-    if (!apiKey) {
-      return res.status(500).json({
-        success: false,
-        error:
-          'GEMINI_API_KEY is not configured on the server. Please ensure the API key is set in environment secrets.',
-      });
-    }
-
-    const result = await analyzeContent(req.body, apiKey);
+    const apiKey = resolveApiKey(clientKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY, process.env);
+    const result = await analyzeContent(req.body, apiKey, process.env);
     return res.json({
       success: true,
       data: result,

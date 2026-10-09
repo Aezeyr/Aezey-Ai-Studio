@@ -6,12 +6,13 @@ export interface Env {
   ASSETS?: {
     fetch: (request: Request) => Promise<Response>;
   };
+  [key: string]: any;
 }
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
+  'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-goog-api-key',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -27,7 +28,7 @@ function jsonResponse(data: any, status = 200, extraHeaders: Record<string, stri
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
@@ -39,11 +40,20 @@ export default {
       });
     }
 
-    // Resolve active API key from Cloudflare worker env or process.env
-    const apiKey = resolveApiKey(env.GEMINI_API_KEY || env.GOOGLE_API_KEY, env);
-    // Sync process.env for runtime compatibility
-    if (apiKey && typeof process !== 'undefined' && process.env) {
-      process.env.GEMINI_API_KEY = apiKey;
+    // Resolve active API key from Cloudflare worker env, globalThis, or process.env
+    const apiKey =
+      resolveApiKey(undefined, env) ||
+      resolveApiKey(undefined, globalThis) ||
+      resolveApiKey(undefined, typeof process !== 'undefined' ? process.env : undefined);
+
+    // Sync process.env and globalThis for runtime compatibility
+    if (apiKey) {
+      if (typeof process !== 'undefined' && process.env) {
+        process.env.GEMINI_API_KEY = apiKey;
+      }
+      if (typeof globalThis !== 'undefined') {
+        (globalThis as any).GEMINI_API_KEY = apiKey;
+      }
     }
 
     const queryKey = url.searchParams.get('apiKey') || undefined;
@@ -87,27 +97,17 @@ export default {
       }
 
       const clientKey = payload?.apiKey || headerKey;
-      const effectiveApiKey = resolveApiKey(clientKey || apiKey, env);
-
-      if (!effectiveApiKey) {
-        return jsonResponse(
-          {
-            success: false,
-            error:
-              'GEMINI_API_KEY is not configured on Cloudflare. Please set GEMINI_API_KEY in Cloudflare Worker Settings -> Variables and Secrets.',
-          },
-          500
-        );
-      }
+      const effectiveApiKey =
+        resolveApiKey(clientKey || apiKey, env) ||
+        resolveApiKey(clientKey, globalThis);
 
       try {
-        const result = await analyzeContent(payload, effectiveApiKey);
+        const result = await analyzeContent(payload, effectiveApiKey, env);
         return jsonResponse({
           success: true,
           data: result,
         });
       } catch (err: any) {
-        console.error('[Cloudflare Worker] Error analyzing media:', err);
         return jsonResponse(
           {
             success: false,
