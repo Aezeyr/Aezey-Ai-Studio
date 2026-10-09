@@ -15,7 +15,7 @@ import { AezeyLogo } from './components/AezeyLogo';
 import { MediaUploader } from './components/MediaUploader';
 import { ResultsDisplay } from './components/ResultsDisplay';
 import { FeaturesShowcase } from './components/FeaturesShowcase';
-import { AnalysisResult, MediaType, TargetPlatform, ContentTone } from './types';
+import { AnalysisResult, MediaType, TargetPlatform, ContentTone, MarketingFormula } from './types';
 
 export default function App() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -51,6 +51,7 @@ export default function App() {
     duration?: number;
     platform: TargetPlatform;
     tone: ContentTone;
+    formula?: MarketingFormula;
     customInstructions?: string;
   }) => {
     setIsAnalyzing(true);
@@ -130,6 +131,15 @@ export default function App() {
   const handleRegenerate = () => {
     if (lastPayload) {
       handleStartAnalysis(lastPayload);
+    }
+  };
+
+  const handleSelectFormula = (selectedFormula: MarketingFormula) => {
+    if (lastPayload) {
+      handleStartAnalysis({
+        ...lastPayload,
+        formula: selectedFormula,
+      });
     }
   };
 
@@ -338,6 +348,7 @@ export default function App() {
               result={result}
               onRegenerate={handleRegenerate}
               onClear={handleClearResults}
+              onSelectFormula={handleSelectFormula}
               isRegenerating={isAnalyzing}
             />
           )}

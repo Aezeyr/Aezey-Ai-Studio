@@ -9,6 +9,8 @@ export type ContentTone = 'engaging' | 'professional' | 'promotional' | 'storyte
 
 export type TargetPlatform = 'all' | 'instagram' | 'linkedin' | 'facebook' | 'tiktok' | 'twitter';
 
+export type MarketingFormula = 'standard' | 'AIDA' | 'PAS' | 'BAB';
+
 export interface AnalysisRequest {
   mediaType: MediaType;
   mimeType: string;
@@ -19,6 +21,7 @@ export interface AnalysisRequest {
   duration?: number; // In seconds for videos
   platform?: TargetPlatform;
   tone?: ContentTone;
+  formula?: MarketingFormula;
   customInstructions?: string;
 }
 
@@ -66,6 +69,7 @@ export interface AnalysisResult {
   timestamp: number;
   primaryCaption: string;
   alternativeCaption: string;
+  urlSlug?: string;
   hashtags: HashtagGroup;
   seoKeywords: SeoKeywordGroup;
   callToAction: string;
@@ -73,6 +77,7 @@ export interface AnalysisResult {
   detectedContext: DetectedContext;
   platform?: TargetPlatform;
   tone?: ContentTone;
+  formula?: MarketingFormula;
   isSimulatedFallback?: boolean;
   authNotice?: string;
 }

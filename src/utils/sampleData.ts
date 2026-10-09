@@ -17,6 +17,79 @@ export interface SamplePreset {
 
 export const SAMPLE_PRESETS: SamplePreset[] = [
   {
+    id: 'digital-marketing',
+    title: 'SEO Test: "Digital Marketing Tips"',
+    category: 'Digital Marketing & SEO',
+    language: 'English',
+    description: 'Verifies natural keyword integration, strictly content-derived hashtags, and SEO-friendly slug ("digital-marketing-tips").',
+    brandExpected: 'Apex Growth Digital',
+    generateDataUrl: () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 800;
+      const ctx = canvas.getContext('2d')!;
+
+      // Background gradient
+      const grad = ctx.createLinearGradient(0, 0, 800, 800);
+      grad.addColorStop(0, '#022c43');
+      grad.addColorStop(0.5, '#053f5c');
+      grad.addColorStop(1, '#115173');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 800, 800);
+
+      // Cyan accent border
+      ctx.strokeStyle = '#00adb5';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(30, 30, 740, 740);
+
+      // Agency header
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 48px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('APEX GROWTH DIGITAL', 400, 140);
+
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillStyle = '#00adb5';
+      ctx.fillText('HIGH-IMPACT SOCIAL & SEARCH STRATEGY', 400, 185);
+
+      // Topic Headline
+      ctx.fillStyle = '#ffd460';
+      ctx.font = 'bold 54px sans-serif';
+      ctx.fillText('DIGITAL MARKETING TIPS 2026', 400, 280);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '24px sans-serif';
+      ctx.fillText('Rank Higher • Drive High-Intent Traffic • Convert Leads', 400, 330);
+
+      // Bullet container
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.roundRect(140, 380, 520, 220, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#00adb5';
+      ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillStyle = '#ffd460';
+      ctx.fillText('Key Growth Drivers:', 180, 430);
+
+      ctx.font = '22px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('• Search Engine Optimization (SEO)', 180, 480);
+      ctx.fillText('• Targeted Social Media Ad Funnels', 180, 525);
+      ctx.fillText('• Conversion Rate Optimization (CRO)', 180, 570);
+
+      // Contact & website
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '22px sans-serif';
+      ctx.fillText('📞 Agency Hotline: +1 (888) 420-GROW', 400, 660);
+      ctx.fillText('🌐 Audit Strategy: www.apexgrowth.agency', 400, 700);
+
+      return canvas.toDataURL('image/jpeg', 0.9);
+    },
+  },
+  {
     id: 'abc-fashion',
     title: 'Brand Test: "ABC Fashion"',
     category: 'Fashion & Retail',
