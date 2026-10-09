@@ -10,3 +10,7 @@ binding = "ASSETS"
 # Configure your GEMINI_API_KEY secret in Cloudflare via:
 #   npx wrangler secret put GEMINI_API_KEY
 # or via Cloudflare Dashboard -> Workers & Pages -> [Your Worker] -> Settings -> Variables and Secrets
+# ...
+[observability]
+enabled = true
+# ...
