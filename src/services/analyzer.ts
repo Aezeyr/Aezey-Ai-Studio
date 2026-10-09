@@ -76,13 +76,37 @@ const RESPONSE_SCHEMA = {
     hashtags: {
       type: Type.OBJECT,
       properties: {
-        industry: { type: Type.ARRAY, items: { type: Type.STRING } },
-        niche: { type: Type.ARRAY, items: { type: Type.STRING } },
-        topic: { type: Type.ARRAY, items: { type: Type.STRING } },
-        audience: { type: Type.ARRAY, items: { type: Type.STRING } },
-        productService: { type: Type.ARRAY, items: { type: Type.STRING } },
+        industry: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: 'High-volume searchable industry category tags for social SEO discoverability',
+        },
+        niche: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: 'High-intent niche and long-tail search tags matching specific visual details',
+        },
+        topic: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: 'Trending and searchable topic tags representing the media theme',
+        },
+        audience: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: 'Searchable community and audience persona tags that target buyers look up',
+        },
+        productService: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: 'Searchable tags reflecting the specific product or service shown in the media',
+        },
         location: { type: Type.ARRAY, items: { type: Type.STRING } },
-        all: { type: Type.ARRAY, items: { type: Type.STRING } },
+        all: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: '20-30 highly relevant, searchable SEO hashtags for maximum visibility across algorithms',
+        },
       },
       required: ['industry', 'niche', 'topic', 'all'],
     },
@@ -435,7 +459,16 @@ You are the advanced content analysis engine of "AEZEY AI Studio".
 CORE MEDIA ANALYSIS & SEO INSTRUCTIONS:
 1. ANALYZE ACTUAL MEDIA CONTENT: Thoroughly examine the visual elements of the uploaded image or video frames (subject, setting, apparel, products, materials, people, activities, aesthetic style).
 2. NATURAL CAPTIONS WITH SMOOTH KEYWORD INTEGRATION: Write engaging, fluent social media captions tailored to the platform. Naturally incorporate high-intent search keywords and descriptive terms smoothly into the copy without awkward phrasing.
-3. STRICTLY CONTENT-DERIVED HASHTAGS (NO APP BRANDING & NO FORMULA LABELS): Generate hashtags strictly based on the actual visual content (industry, niche, topic, audience, products, setting). NEVER include the application name in hashtags (DO NOT generate #AEZEY, #AEZEYAIStudio) and NEVER include formula tags or labels (DO NOT generate #AIDA, #AIDAFormula, #PAS, #PASFormula, #BAB, #BABFormula).
+3. SEO-FRIENDLY & HIGHLY SEARCHABLE HASHTAGS (MAXIMUM DISCOVERABILITY & VISIBILITY):
+   - Generate hashtags engineered for social search SEO and maximum organic discoverability across search algorithms (Instagram Search, TikTok SEO, YouTube, LinkedIn, X/Twitter, and Google Search).
+   - Every hashtag must be a searchable, high-intent term or popular query that target buyers, viewers, or clients actively type into social search bars.
+   - Provide an extensive, curated collection of 20 to 30 hashtags in the "all" field, covering:
+     * High-volume primary category and industry search terms
+     * Mid-tail and long-tail niche search tags matching exact visual details
+     * Product/service-specific search tags (the exact product type, dish, garment, software, or service shown)
+     * Target audience community and lifestyle search tags
+   - STRICT RULE: NEVER include the application name in hashtags (DO NOT generate #AEZEY, #AEZEYAIStudio).
+   - STRICT RULE: NEVER include formula names or structural labels in hashtags (DO NOT generate #AIDA, #AIDAFormula, #PAS, #PASFormula, #BAB, #BABFormula).
 4. SEO-FRIENDLY URL SLUG: Generate a clean, search-optimized URL slug (e.g., "digital-marketing-tips", "urban-streetwear-sneakers-drop", "luxury-minimalist-living-room") in lowercase kebab-case representing the uploaded content's primary topic, suitable for blog articles or landing pages.
 5. ADHERE TO USER SPECIAL INSTRUCTIONS WITHOUT ECHOING: If the user provides custom special instructions below, faithfully and strictly implement their formatting and stylistic requests (e.g., formatting features or services into bullet points, sentence length, tone nuance, emojis). NEVER quote, copy, or print the instruction text itself into the caption.
 ${formula && formula !== 'standard' ? `
@@ -448,11 +481,16 @@ ABSOLUTE REQUIREMENTS FOR FORMULA OUTPUT:
 - STRICT USER FORMATTING & STYLISTIC COMPLIANCE: If the user specified special instructions (e.g., formatting services or features into bullet points, line breaks, emojis, concise length), you MUST strictly follow those formatting and stylistic directives while still applying the underlying ${formula} psychological progression.
 
 ${formula === 'AIDA' ? `
-AIDA ARC (Apply naturally without ANY headings or labels):
-- Open immediately with a magnetic, scroll-stopping hook referencing what is seen in the media.
-- Seamlessly transition into relatable context, fascinating details, or story about the subject.
-- Build deep desire by highlighting the tangible transformation, benefits, and experience.
-- Conclude with a natural, inviting call to action (CTA).
+AIDA ARC (PRODUCT/SERVICE REFLECTION, CASUAL & NATURAL TONE, DIRECT AUDIENCE ATTRACTION):
+- REFLECT SPECIFIC PRODUCT OR SERVICE: Identify the exact product, service, craft, dish, apparel, tech, or offering showcased in the uploaded media. Center the entire caption around this specific product/service—highlighting its real-world utility, standout qualities, craftsmanship, materials, or deliverables. Avoid vague generalities.
+- DIRECTLY ATTRACT TARGET AUDIENCE: Hook the ideal target audience right away with an opening that speaks straight to them ("you", "your", "if you're looking for...", "creators who want...", "for anyone needing..."). Directly touch on their desires, everyday needs, or taste.
+- CASUAL AND NATURAL HUMAN TONE: The writing must feel relaxed, approachable, conversational, and genuinely human—like a trusted friend, creator, or insider enthusiastically recommending something great. Avoid stiff corporate jargon, robotic claims, or hyper-formal business speak.
+- SEAMLESS ATTENTION • INTEREST • DESIRE • ACTION PROGRESSION:
+  1. (Attention): A casual, magnetic hook spotlighting the product/service and calling out the target audience.
+  2. (Interest): Intriguing details, unique characteristics, or relatable context about how the product/service works.
+  3. (Desire): The tangible benefits, sensory appeal, transformation, or everyday satisfaction it provides.
+  4. (Action): A friendly, casual call to action inviting them to try, order, click the bio link, save, or comment.
+- NO STRUCTURAL HEADINGS: Blend all four phases into seamless, flowing natural prose with ZERO headings or labels.
 ` : formula === 'PAS' ? `
 PAS ARC (Apply naturally without ANY headings or labels):
 - Open by identifying a relatable, genuine problem or frustration your audience faces.
@@ -777,11 +815,17 @@ export function generateIntelligentFallback(
 
     if (formula === 'AIDA') {
       mktPrimary = wantsBulletPoints
-        ? 'Are you pouring hours into content that gets lost in the feed without driving real revenue? In 2026, real online growth isn\'t about vanity views—it\'s about high-intent SEO, frictionless conversion funnels, and data-backed campaigns that capture your ideal clients at the exact moment they\'re ready to buy. Here is how we build that high-converting growth engine for your brand:\n\n• High-Intent Search Engine Optimization (SEO) to rank for ready-to-buy search terms\n• Conversion Rate Optimization (CRO) turning website visitors into paying clients\n• Laser-Targeted Social Ad Funnels across Meta, TikTok, and LinkedIn\n• Strategic Content & Copywriting that builds authority and long-term trust\n\nImagine waking up to a steady pipeline of qualified inbound leads and lower customer acquisition costs. Stop leaving revenue on the table—tap the link in our bio or message us today to claim your free strategy audit!'
-        : 'Are you pouring hours into content that gets lost in the feed without driving real revenue? In 2026, real online growth isn\'t about vanity views—it\'s about high-intent SEO, frictionless conversion funnels, and data-backed campaigns that capture your ideal clients at the exact moment they\'re ready to buy. Imagine waking up to a steady pipeline of qualified inbound leads, lower customer acquisition costs, and top search rankings that your competitors can\'t touch. Stop leaving revenue on the table. Tap the link in our bio or DM us today to claim your free strategy audit!';
+        ? 'If you\'re pouring hours into content only to hear crickets and watch sales stall, you\'re not alone. Our full-funnel digital marketing service is built for founders and brand owners who are ready to turn passive traffic into loyal paying customers without the guesswork. Here is how we build that high-converting growth engine for your brand:\n\n• High-Intent Search Engine Optimization (SEO) to rank for search queries your ideal buyers actually type\n• Friction-Free Conversion Funnels engineered to turn website visitors into qualified clients\n• Targeted Social Ad Campaigns across Meta, TikTok, and LinkedIn with zero wasted ad spend\n• Relatable Content & Copywriting Strategy that builds instant authority and long-term customer trust\n\nImagine waking up to a steady pipeline of qualified inbound leads and lower customer acquisition costs every single week. Stop leaving revenue on the table—tap the link in our bio or drop us a message today to claim your free strategy audit!'
+        : 'If you\'re pouring hours into content only to hear crickets and watch sales stall, you\'re not alone. Our full-funnel digital marketing service is built for founders and brand owners who are ready to turn passive traffic into loyal paying customers without the guesswork. We pair high-intent SEO with friction-free conversion funnels and targeted social ad campaigns, so your ideal clients find you right when they\'re ready to buy. Imagine waking up to a steady pipeline of qualified inbound leads and lower customer acquisition costs every single week. Stop leaving revenue on the table. Tap the link in our bio or DM us today to claim your free strategy audit!';
       mktAlt =
-        'Stop burning budget on dead-end traffic that never converts into paying customers. Modern SEO and friction-free landing funnels connect you directly with ready-to-buy clients when they need you most. Experience predictable revenue growth and higher search visibility every month. Send us a message today to build your custom growth engine.';
-      mktTags = ['#DigitalMarketingTips', '#SEOStrategy', '#ConversionFunnels', '#HighIntentMarketing', '#ContentStrategy', '#B2BGrowth', '#GrowthMarketing'];
+        'Stop burning budget on dead-end traffic that never converts into paying customers. Our custom SEO and friction-free landing funnels connect you directly with ready-to-buy clients when they need you most. Experience predictable revenue growth and higher search visibility every month. Send us a message today to build your custom growth engine.';
+      mktTags = [
+        '#DigitalMarketingTips', '#SEOStrategy', '#ConversionFunnels', '#HighIntentMarketing',
+        '#ContentStrategy', '#B2BGrowth', '#GrowthMarketing', '#SocialMediaSEO',
+        '#MarketingForSmallBusiness', '#LeadGenerationTips', '#WebsiteTraffic', '#OnlineBusinessGrowth',
+        '#EntrepreneurTips', '#MarketingAgency', '#SearchEngineOptimization', '#InboundMarketing',
+        '#MarketingConsultant', '#ClientAcquisition', '#ScaleYourBusiness', '#DigitalStrategy',
+      ];
     } else if (formula === 'PAS') {
       mktPrimary = wantsBulletPoints
         ? 'You\'re spending countless hours posting content, running tests, and updating your website, yet traffic bounces without buying. Every month that goes by without a high-converting funnel is money burned on unengaged clicks and missed opportunities that your competitors are actively claiming. Our proven digital marketing strategies fix every leak in your pipeline:\n\n• High-Intent Search Engine Optimization (SEO) to capture ready-to-buy searchers\n• Conversion Rate Optimization (CRO) turning traffic into paying customers\n• Laser-Targeted Social Ad Funnels across Meta, LinkedIn, and TikTok\n• Continuous Pipeline Analytics that lower your acquisition costs\n\nReady to finally scale your business without the guesswork? Tap the link in our bio or message us to get your customized funnel roadmap!'
@@ -887,11 +931,17 @@ export function generateIntelligentFallback(
 
     if (formula === 'AIDA') {
       techPrimary = wantsBulletPoints
-        ? 'What if your engineering team could cut 70% of manual cloud operations starting this week? NEXUS AI CLOUD deploys autonomous workflow agents that unite distributed infrastructure with real-time multi-cloud synchronization. Here is how our architecture elevates your developer velocity:\n\n• Autonomous Intelligent Agents that slash routine DevOps tasks by over 70%\n• Real-Time Multi-Cloud Synchronization with zero configuration downtime\n• 100+ Zero-Setup API Connectors to link distributed enterprise databases\n• SOC-2 Type II Certified Security guaranteeing compliance and peace of mind\n\nFree your senior engineers from fragile scripts and repetitive pipelines so they can build revenue-generating features. Claim your 14-day free trial today at www.nexusai.cloud (No credit card required)!'
-        : 'What if your engineering team could cut 70% of manual cloud operations starting this week? NEXUS AI CLOUD deploys autonomous workflow agents that unite distributed architecture with real-time multi-cloud synchronization and 100+ zero-setup connectors. Free your senior developers from brittle scripts and repetitive pipelines so they can focus on building revenue-generating features with enterprise SOC-2 Type II peace of mind. Claim your 14-day free trial today at www.nexusai.cloud (No credit card required)!';
+        ? 'Ever feel like your engineering team spends more time babysitting cloud scripts than actually shipping features? Meet NEXUS AI CLOUD—the autonomous workflow platform that syncs multi-cloud infrastructure in real time with over 100 zero-setup connectors. Here is how our platform elevates your developer velocity:\n\n• Autonomous Intelligent Agents that slash routine DevOps tasks by over 70%\n• Real-Time Multi-Cloud Synchronization with zero configuration downtime\n• 100+ Zero-Setup API Connectors linking distributed databases in seconds\n• Enterprise-grade SOC-2 Type II Certified Security guaranteeing compliance and peace of mind\n\nFree your senior engineers from fragile deployment pipelines so they can build revenue-generating features. Ready to see how easy cloud automation can be? Grab your 14-day free trial at www.nexusai.cloud with no credit card required!'
+        : 'Ever feel like your engineering team spends more time babysitting cloud scripts than actually shipping features? Meet NEXUS AI CLOUD—the autonomous workflow platform that syncs multi-cloud infrastructure in real time with over 100 zero-setup connectors. Ditch fragile deployment pipelines and manual firefighting so your developers can focus on building what matters, backed by enterprise-grade SOC-2 Type II security. Ready to see how easy cloud automation can be? Grab your 14-day free trial today at www.nexusai.cloud with no credit card required!';
       techAlt =
         'Stop manual cloud firefighting that drains your engineering resources. Nexus AI synchronizes multi-cloud environments in real-time, cutting 70% of DevOps overhead while elevating team velocity. Start your 14-day free trial today at www.nexusai.cloud.';
-      techTags = ['#TechInnovation', '#NexusAI', '#DevOpsAutomation', '#CloudComputing', '#AIAgents', '#SoftwareEngineering'];
+      techTags = [
+        '#CloudComputing', '#DevOpsTools', '#WorkflowAutomation', '#SaaSSolutions',
+        '#ArtificialIntelligence', '#SoftwareEngineering', '#DeveloperTools', '#TechStartup',
+        '#CloudInfrastructure', '#AutomateWorkflows', '#TechInnovation', '#EnterpriseSoftware',
+        '#AIAgents', '#DevOpsEngineers', '#SoftwareArchitecture', '#BackendDevelopment',
+        '#ContinuousDeployment', '#CloudManagement', '#FullStackDev', '#TechCommunity',
+      ];
     } else if (formula === 'PAS') {
       techPrimary = wantsBulletPoints
         ? 'Manual cloud workflows and broken deployment scripts are stalling your team\'s sprint velocity. Every hour your senior engineers spend firefighting cloud sync issues and API mismatches is engineering capital burned and product delivery delayed. NEXUS AI CLOUD automates enterprise workflows with complete operational peace of mind:\n\n• Real-Time Multi-Cloud Synchronization across all environments\n• Zero-Setup API Connectors linking your existing architecture instantly\n• Autonomous Intelligent Agents cutting operations overhead by over 70%\n• Enterprise-Grade Security with SOC-2 Type II verification\n\nAccelerate your releases and free your engineers—start your 14-day free trial at www.nexusai.cloud!'
@@ -999,11 +1049,17 @@ export function generateIntelligentFallback(
 
     if (formula === 'AIDA') {
       fshPrimary = wantsBulletPoints
-        ? 'Stop scrolling—your wardrobe\'s ultimate summer upgrade just dropped. The ABC FASHION Summer Drop 2026 brings together handcrafted couture silhouettes and effortless urban streetwear, cut from breathable premium textiles. Here is what makes this drop a must-have:\n\n• Handcrafted luxury streetwear silhouettes tailored for warm-weather breathability\n• Exclusive limited-time 40% OFF storewide with pieces starting at just $49.99\n• Premium designer textiles crafted for long-lasting fit and shape\n• Fast global express shipping with eco-luxe packaging\n\nFeel the confidence of luxury statement wear without the traditional boutique markup. Shop the drop online at www.abcfashionstore.com or visit our Downtown Metro flagship store before your size sells out!'
-        : 'Stop scrolling—your wardrobe\'s ultimate summer upgrade just dropped. The ABC FASHION Summer Drop 2026 brings together handcrafted couture silhouettes and effortless urban streetwear, cut from breathable premium textiles. Feel the confidence of luxury statement pieces starting at only $49.99, plus save an exclusive 40% OFF storewide for a limited time. Shop the drop online at www.abcfashionstore.com or visit our Downtown Metro flagship store before your size sells out!';
+        ? 'If you\'ve been looking for that effortless summer fit that actually keeps you cool while turning heads, you just found it. The ABC FASHION Summer Drop 2026 brings together handcrafted couture silhouettes and relaxed urban streetwear, cut from ultra-breathable premium textiles. Here is why this drop is an absolute must-have:\n\n• Handcrafted luxury streetwear silhouettes tailored for warm-weather breathability\n• Exclusive limited-time 40% OFF storewide with statement pieces starting at just $49.99\n• Premium designer textiles crafted for long-lasting fit, color, and shape\n• Fast global express shipping with eco-luxe packaging\n\nFeel the confidence of luxury statement wear without the traditional boutique markup. Shop the drop online at www.abcfashionstore.com or visit our Downtown Metro flagship store before your size sells out!'
+        : 'If you\'ve been looking for that effortless summer fit that actually keeps you cool while turning heads, you just found it. The ABC FASHION Summer Drop 2026 brings together handcrafted couture silhouettes and relaxed urban streetwear, cut from ultra-breathable premium textiles. Feel the confidence of luxury statement pieces starting at only $49.99, plus save an exclusive 40% OFF storewide for a limited time. Shop the drop online at www.abcfashionstore.com or visit our Downtown Metro flagship store before your size sells out!';
       fshAlt =
         'Summer style redefined with handcrafted couture streetwear from ABC Fashion. Enjoy 40% off storewide with statement pieces starting at $49.99. Tap the link in our bio to shop the drop today.';
-      fshTags = ['#SummerDrop2026', '#StreetwearStyle', '#OOTDFashion', '#HauteCouture', '#FashionUpgrade', '#StyleInspo', '#ABCFashion'];
+      fshTags = [
+        '#StreetwearStyle', '#SummerOutfits2026', '#OOTDInspo', '#StreetwearFashion',
+        '#SummerFashionTrends', '#FashionDrop', '#OutfitIdeas', '#AffordableLuxury',
+        '#TrendyStreetwear', '#StyleInspiration', '#FashionBlogger', '#CasualStreetwear',
+        '#MenswearStyle', '#WomensFashion', '#SummerDrop', '#StreetStyleInspo',
+        '#FitCheck', '#StreetwearCommunity', '#UrbanWear', '#FashionDeals',
+      ];
     } else if (formula === 'PAS') {
       fshPrimary = wantsBulletPoints
         ? 'Struggling to find summer streetwear that actually balances luxury craftsmanship with all-day breathability and comfort? Cheap fast fashion loses its fit after two washes, while traditional luxury boutiques charge outrageous prices for everyday statement wear. ABC FASHION delivers handcrafted couture quality directly to your doorstep:\n\n• Premium breathable textiles engineered for all-day comfort\n• Handcrafted luxury streetwear silhouettes starting at just $49.99\n• Limited-time 40% OFF storewide across the entire collection\n• Durable designer stitching that preserves shape and color\n\nShop the Summer Drop now at www.abcfashionstore.com and elevate your everyday style!'
@@ -1096,14 +1152,24 @@ export function generateIntelligentFallback(
   }
 
   if (isUrduAcademy) {
+    let urdPrimary =
+      'روشن اکیڈمی آف ایکسیلنس میں تعلیمی سیشن 2026 کے لیے داخلے جاری ہیں! میٹرک، ایف ایس سی اور او لیول کے طلبہ کے لیے ماہر اساتذہ، جامع امتحانی تیاری اور پہلے 50 طلبہ کے لیے فیس میں 30 فیصد خصوصی رعایت۔\n\n📞 رابطہ نمبر: 0300-1234567\n📍 گلبرگ مین بلیوارڈ، لاہور۔ اپنے بچے کے روشن مستقبل کی جانب پہلا قدم آج ہی اٹھائیں!';
+    let urdAlt =
+      'کیا آپ تعلیمی امتحانات میں 100% شاندار نتائج چاہتے ہیں؟ روشن اکیڈمی میں داخلہ لیں اور 30 فیصد فیس میں رعایت کا فائدہ اٹھائیں۔ محدود نشستیں دستیاب ہیں! ابھی کال کریں: 0300-1234567۔';
+
+    if (formula === 'AIDA') {
+      urdPrimary =
+        'کیا آپ اپنے بچے کے شاندار تعلیمی مستقبل اور بورڈ امتحانات میں ٹاپ پوزیشن کے خواہش مند ہیں؟ روشن اکیڈمی آف ایکسیلنس لا رہی ہے سیشن 2026 کے لیے داخلے—جہاں تجربہ کار اساتذہ، جدید تعلیمی ماحول، اور میٹرک، ایف ایس سی اور او لیول کی مکمل تیاری کروائی جاتی ہے۔ اپنے بچے کو ایک روشن تعلیمی مستقبل دیں اور پہلے 50 طلبہ کے لیے 30 فیصد خصوصی فیس رعایت سے فائدہ اٹھائیں۔ نشستیں محدود ہیں، آج ہی 0300-1234567 پر رابطہ کریں یا گلبرگ کیمپس تشریف لائیں!';
+      urdAlt =
+        'روشن اکیڈمی آف ایکسیلنس میں تعلیمی سیشن 2026 کے داخلے اور 30 فیصد خصوصی رعایت! ابھی رابطہ کریں: 0300-1234567۔';
+    }
+
     return {
       id: 'aezey_urd_' + Date.now().toString(36),
       timestamp: Date.now(),
       urlSlug: 'roshan-academy-admissions-scholarship-2026',
-      primaryCaption:
-        'روشن اکیڈمی آف ایکسیلنس میں تعلیمی سیشن 2026 کے لیے داخلے جاری ہیں! میٹرک، ایف ایس سی اور او لیول کے طلبہ کے لیے ماہر اساتذہ، جامع امتحانی تیاری اور پہلے 50 طلبہ کے لیے فیس میں 30 فیصد خصوصی رعایت۔\n\n📞 رابطہ نمبر: 0300-1234567\n📍 گلبرگ مین بلیوارڈ، لاہور۔ اپنے بچے کے روشن مستقبل کی جانب پہلا قدم آج ہی اٹھائیں!',
-      alternativeCaption:
-        'کیا آپ تعلیمی امتحانات میں 100% شاندار نتائج چاہتے ہیں؟ روشن اکیڈمی میں داخلہ لیں اور 30 فیصد فیس میں رعایت کا فائدہ اٹھائیں۔ محدود نشستیں دستیاب ہیں! ابھی کال کریں: 0300-1234567۔',
+      primaryCaption: stripFormulaLabels(stripInstructionEcho(urdPrimary, customInstructions)),
+      alternativeCaption: stripFormulaLabels(stripInstructionEcho(urdAlt, customInstructions)),
       hashtags: {
         industry: ['#Education', '#Academies', '#UrduEducation', '#StudyInPakistan'],
         niche: ['#LahoreAcademies', '#MatricPreps', '#FScClasses', '#OLevelsLahore'],
@@ -1188,7 +1254,13 @@ export function generateIntelligentFallback(
         : 'Nothing hits the spot quite like steaming hot, authentic Biryani when weekend hunger strikes! Karachi Bites brings you our Weekend Dhamaka Deal—fragrant Basmati rice, perfectly spiced tender chicken, served alongside fresh raita and an ice-cold beverage. Pure traditional aroma and bold flavor in every single bite, all for an unbeatable Rs. 499 complete meal deal with free home delivery right to your doorstep. Don\'t let dinner wait! Call 0321-9876543 right now to order your hot biryani delivered in minutes!';
       foodAlt =
         'Craving real spice that hits the spot? Karachi Bites special Chicken Biryani plus cold drink and raita delivers full authentic flavor for only Rs. 499. Call 0321-9876543 for instant free delivery!';
-      foodTags = ['#BiryaniDeals', '#KarachiBites', '#WeekendFoodDeals', '#DesiFoodies', '#FoodDeliveryKarachi', '#PakistaniFood'];
+      foodTags = [
+        '#BiryaniLovers', '#KarachiFood', '#KarachiEats', '#DesiFoodies',
+        '#ChickenBiryani', '#FoodDeliveryKarachi', '#StreetFoodKarachi', '#PakistaniStreetFood',
+        '#WeekendFoodDeals', '#BiryaniCravings', '#BestBiryani', '#FoodieFavorites',
+        '#DesiCuisine', '#KarachiRestaurants', '#LateNightFoodKarachi', '#FoodPornDaily',
+        '#BiryaniDeals', '#AuthenticSpices', '#HalalFoodies', '#PakistanFoodStreet',
+      ];
     } else if (formula === 'PAS') {
       foodPrimary = wantsBulletPoints
         ? 'Tired of uninspiring dinners and overpriced takeout that fails to satisfy your authentic spice cravings? Settling for bland food on your weekend is a letdown—and spending hours in the kitchen defeats the whole point of relaxing with family. Karachi Bites Weekend Dhamaka Deal delivers complete satisfaction straight to your door:\n\n• Piping-hot special Chicken Biryani with authentic Karachi aroma\n• Chilled cold drink + fresh traditional raita included\n• Complete feast for only Rs. 499/- with zero delivery charges\n\n📞 Order Now: 0321-9876543 to get your hot biryani delivered in minutes!'
@@ -1280,11 +1352,19 @@ export function generateIntelligentFallback(
   }
 
   // Generic / Custom upload handler
-  const displayTopic = fileName ? fileName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ') : 'Visual Showcase';
+  const rawFileName = fileName ? fileName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').trim() : '';
+  const isDefaultName = !rawFileName || /^(img|image|video|photo|screenshot|file|pic|dsc|mov|mp4)[\d\s_-]*$/i.test(rawFileName);
+  const displayTopic = isDefaultName
+    ? (cleanInstructions.length > 3 && cleanInstructions.length < 50
+        ? cleanInstructions.replace(/^(keep|format|make|write|please)\s+/i, '').trim()
+        : (mediaType === 'video' ? 'Featured Video Showcase' : 'Featured Product Showcase'))
+    : rawFileName;
+
   const isVideo = mediaType === 'video';
   const wantsBulletPoints = /bullet|points|list|service/i.test(cleanInstructions);
   const topicSlug = formatUrlSlug(displayTopic);
   const topicTag = displayTopic.replace(/[\s\-_]+/g, '');
+  const cleanProduct = displayTopic.charAt(0).toUpperCase() + displayTopic.slice(1);
 
   let primaryCaptionText: string;
   let alternativeCaptionText: string;
@@ -1300,15 +1380,39 @@ export function generateIntelligentFallback(
   if (formula === 'AIDA') {
     primaryCaptionText = wantsBulletPoints
       ? (isVideo
-          ? `Take a closer look at "${displayTopic}"—this is where high-energy motion meets instant social impact. Every detail here was crafted to stop the scroll, combining dynamic visual pacing with compelling storytelling tailored for your feed. Here are the key moments that elevate this piece:\n\n• High-energy visual pacing designed for instant engagement\n• Intentional focal contrast and rich color composition\n• Cross-platform visual hook crafted for maximum algorithmic reach\n\nElevate your audience's experience and create content that inspires genuine conversation. Double-tap if you appreciate this aesthetic and share your thoughts in the comments below!`
-          : `Take a closer look at "${displayTopic}"—this is where intentional design meets instant social impact. Every detail here was curated to stop the scroll, combining a rich visual aesthetic with clear, compelling storytelling tailored for your feed. Here is what makes this stand out:\n\n• High-resolution craftsmanship and intentional composition\n• Clean focal contrast designed to command attention in the feed\n• Curated visual storytelling that sparks authentic community connection\n\nElevate your audience's experience and create content that inspires genuine loyalty. Double-tap if you appreciate this aesthetic and share your thoughts in the comments below!`)
+          ? `If you've been on the lookout for a standout ${cleanProduct} that actually delivers without the usual hype, you're going to love this. Designed specifically for anyone who values real-world quality, thoughtful details, and effortless performance, here is why everyone is raving about it:\n\n• Purpose-built craftsmanship engineered for reliable, everyday performance\n• Clean, thoughtful design that saves you time and simplifies your routine\n• Sleek modern aesthetic that turns heads while fitting right into your lifestyle\n• Community-tested durability that delivers authentic long-term value\n\nExperience the difference for yourself and see why it's quickly becoming a daily favorite. Tap the link in our bio to check it out or drop a comment below with your questions!`
+          : `If you've been on the lookout for a standout ${cleanProduct} that actually delivers without the usual hype, you're going to love this. Designed specifically for anyone who values real-world quality, thoughtful details, and effortless performance, here is why everyone is raving about it:\n\n• Purpose-built craftsmanship engineered for reliable, everyday performance\n• Clean, thoughtful design that saves you time and simplifies your routine\n• Sleek modern aesthetic that turns heads while fitting right into your lifestyle\n• Community-tested durability that delivers authentic long-term value\n\nExperience the difference for yourself and see why it's quickly becoming a daily favorite. Tap the link in our bio to check it out or drop a comment below with your questions!`)
       : (isVideo
-          ? `Take a closer look at "${displayTopic}"—this is where high-energy motion meets instant social impact. Every frame here was curated to stop the scroll, combining dynamic visual pacing with compelling storytelling tailored for your feed. Experience content that inspires genuine conversation, connection, and repeat views. Double-tap if you appreciate this aesthetic and share your perspective in the comments below!`
-          : `Take a closer look at "${displayTopic}"—this is where intentional design meets instant social impact. Every detail here was curated to stop the scroll, combining a rich visual aesthetic with clear, compelling storytelling tailored for your feed. Elevate your audience's experience and create content that inspires genuine conversation, connection, and long-term loyalty. Double-tap if you appreciate this aesthetic and share your thoughts in the comments below!`);
+          ? `If you've been on the hunt for a standout ${cleanProduct} that actually delivers on its promise, you're going to love this. Crafted specifically for people who appreciate thoughtful craftsmanship, clean aesthetics, and effortless everyday performance, it takes what you usually expect and elevates it across the board. You get a reliable, satisfying experience that fits right into your routine without any unnecessary complications or cut corners. Ready to see what makes it special? Check it out via the link in our bio, save this post for later, and let us know your thoughts in the comments below!`
+          : `If you've been on the hunt for a standout ${cleanProduct} that actually delivers on its promise, you're going to love this. Crafted specifically for people who appreciate thoughtful craftsmanship, clean aesthetics, and effortless everyday performance, it takes what you usually expect and elevates it across the board. You get a reliable, satisfying experience that fits right into your routine without any unnecessary complications or cut corners. Ready to see what makes it special? Check it out via the link in our bio, save this post for later, and let us know your thoughts in the comments below!`);
 
     alternativeCaptionText =
-      `Stand out in the feed with "${displayTopic}". High-impact visuals crafted for engagement and authentic connection with your audience. Save this post and follow for more daily inspiration!`;
-    genericTags = [`#${topicTag}`, '#VisualStorytelling', '#CreativeHook', '#SocialMediaGrowth', '#ViralAesthetic', '#ContentCreation'];
+      `Meet ${cleanProduct}—your new daily favorite designed to elevate your everyday routine with clean style and reliable quality. Tap the link in our bio to explore all the details!`;
+
+    genericTags = [
+      `#${topicTag}`,
+      `#${topicTag}Online`,
+      `#${topicTag}Review`,
+      `#Best${topicTag}`,
+      `#Shop${topicTag}`,
+      `#${topicTag}Inspo`,
+      `#${topicTag}Life`,
+      '#TrendingNow',
+      '#MustHaves',
+      '#ViralFinds',
+      '#ProductRecommendations',
+      '#QualityFirst',
+      '#DailyEssentials',
+      '#ForYouPage',
+      '#ExplorePage',
+      '#CustomerFavorites',
+      '#TopRated',
+      '#DiscoverMore',
+      '#LifestyleUpgrade',
+      '#ThingsYouNeed',
+      '#NewDrop',
+      '#ShopOnline',
+    ];
   } else if (formula === 'PAS') {
     primaryCaptionText = wantsBulletPoints
       ? (isVideo
@@ -1350,11 +1454,19 @@ export function generateIntelligentFallback(
     primaryCaption: stripFormulaLabels(stripInstructionEcho(primaryCaptionText, customInstructions)),
     alternativeCaption: stripFormulaLabels(stripInstructionEcho(alternativeCaptionText, customInstructions)),
     hashtags: {
-      industry: ['#VisualMedia', '#CreativeShowcase', '#DigitalContent', '#TrendingNow'],
-      niche: [`#${topicTag}`, '#VisualAesthetics', '#ModernStyle', '#ViralInspo'],
-      topic: ['#CreativeDesign', '#VisualStorytelling', '#ContentStrategy', '#StyleInspo'],
-      audience: ['#ContentCreators', '#CreativeCommunity', '#Trendsetters', '#DigitalMinds'],
-      productService: [`#${topicTag}Features`, '#FeaturedPost', '#CuratedMedia'],
+      industry: formula === 'AIDA'
+        ? ['#TrendingNow', '#DailyEssentials', '#QualityFirst', '#ShopOnline']
+        : ['#VisualMedia', '#CreativeShowcase', '#DigitalContent', '#TrendingNow'],
+      niche: formula === 'AIDA'
+        ? [`#${topicTag}`, `#${topicTag}Online`, `#${topicTag}Review`, `#Best${topicTag}`]
+        : [`#${topicTag}`, '#VisualAesthetics', '#ModernStyle', '#ViralInspo'],
+      topic: formula === 'AIDA'
+        ? ['#ProductRecommendations', '#ViralFinds', '#MustHaves', '#DiscoverMore']
+        : ['#CreativeDesign', '#VisualStorytelling', '#ContentStrategy', '#StyleInspo'],
+      audience: formula === 'AIDA'
+        ? ['#ForYouPage', '#ExplorePage', '#CustomerFavorites', '#TopRated']
+        : ['#ContentCreators', '#CreativeCommunity', '#Trendsetters', '#DigitalMinds'],
+      productService: [`#${topicTag}`, `#${topicTag}Inspo`, `#${topicTag}Features`, `#Shop${topicTag}`],
       location: ['#GlobalReach', '#EverydayInspiration'],
       all: genericTags,
     },
