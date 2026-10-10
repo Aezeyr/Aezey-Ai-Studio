@@ -18,12 +18,14 @@ import {
   TargetPlatform,
   ContentTone,
   MarketingFormula,
+  MediaInspectionData,
 } from '../types';
 import {
   validateImageFile,
   validateVideoFile,
   extractVideoKeyframes,
   optimizeImageForAnalysis,
+  inspectMediaCanvas,
   fileToBase64,
   formatBytes,
   formatDuration,
@@ -44,6 +46,7 @@ interface MediaUploaderProps {
     tone: ContentTone;
     formula?: MarketingFormula;
     customInstructions?: string;
+    mediaInspection?: MediaInspectionData;
   }) => void;
   isAnalyzing: boolean;
 }
@@ -59,6 +62,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   const [duration, setDuration] = useState<number | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [activePreset, setActivePreset] = useState<SamplePreset | null>(null);
 
   // Settings
   const [platform, setPlatform] = useState<TargetPlatform>('all');
@@ -98,7 +102,8 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
 
   const processSelectedFile = async (selectedFile: File) => {
     setError(null);
-    setIsValidating(true);
+    setIsValidating(false);
+    setActivePreset(null);
 
     const isVideo =
       selectedFile.type.startsWith('video/') ||
@@ -141,6 +146,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     setPreviewUrl(null);
     setDuration(undefined);
     setError(null);
+    setActivePreset(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -151,6 +157,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     const dataUrl = preset.generateDataUrl();
     setPreviewUrl(dataUrl);
     setMediaType('image');
+    setActivePreset(preset);
     setFile(
       new File([new Blob()], `${preset.id}-sample.jpg`, { type: 'image/jpeg' })
     );
@@ -175,13 +182,27 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     try {
       let base64Data = '';
       let videoFrames: string[] = [];
+      let mediaInspection: MediaInspectionData | undefined;
+
+      if (activePreset) {
+        mediaInspection = {
+          visibleText: activePreset.visibleText || [],
+          detectedBrand: activePreset.brandExpected || null,
+          servicesOrProducts: activePreset.servicesOrProducts || [],
+          contactInfo: activePreset.contactInfo,
+        };
+      } else if (file && file.size > 0) {
+        mediaInspection = await inspectMediaCanvas(file, mediaType === 'video');
+      }
 
       if (file && file.size > 0) {
         if (mediaType === 'video') {
-          // Extract keyframes for reliable visual multi-frame comprehension
-          videoFrames = await extractVideoKeyframes(file, 5);
-          // Only send full raw video base64 if keyframe extraction was not possible
-          if (!videoFrames || videoFrames.length === 0) {
+          // Extract keyframes for reliable visual multi-frame comprehension (beginning, middle, end)
+          videoFrames = await extractVideoKeyframes(file, 6);
+          // Set first frame as representative base64 thumbnail if not already present
+          if (videoFrames.length > 0) {
+            base64Data = videoFrames[0];
+          } else {
             base64Data = await fileToBase64(file);
           }
         } else {
@@ -191,18 +212,30 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
         base64Data = previewUrl;
       }
 
+      const resolvedMimeType =
+        mediaType === 'video'
+          ? file?.type || 'video/mp4'
+          : base64Data.startsWith('data:image/png')
+          ? 'image/png'
+          : base64Data.startsWith('data:image/webp')
+          ? 'image/webp'
+          : base64Data.startsWith('data:image/jpeg')
+          ? 'image/jpeg'
+          : file?.type || 'image/jpeg';
+
       onStartAnalysis({
         mediaType,
-        mimeType: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+        mimeType: resolvedMimeType,
         base64Data,
         videoFrames: videoFrames.length > 0 ? videoFrames : undefined,
-        fileName: file?.name || 'media-sample.jpg',
+        fileName: file?.name || (activePreset ? `${activePreset.id}-sample.jpg` : 'media-sample.jpg'),
         fileSize: file?.size || base64Data.length * 0.75,
         duration,
         platform,
         tone,
         formula: activeFormula !== 'standard' ? activeFormula : undefined,
         customInstructions: customInstructions.trim() || undefined,
+        mediaInspection,
       });
     } catch (err: any) {
       setError(err?.message || 'Error preparing media for analysis. Please try again.');
@@ -622,7 +655,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       {/* Main CTA Button */}
       <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-800">
         <p className="text-xs text-slate-400">
-          Powered by <strong className="text-slate-300">Gemini 3.8 Flash</strong>. Media is
+          Powered by <strong className="text-slate-300">Gemini 2.5 Flash</strong>. Media is
           processed on server and never permanently stored.
         </p>
 

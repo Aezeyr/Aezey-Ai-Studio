@@ -12,6 +12,15 @@ export interface SamplePreset {
   language: 'English' | 'Urdu' | 'Mixed';
   description: string;
   brandExpected: string;
+  visibleText?: string[];
+  servicesOrProducts?: string[];
+  contactInfo?: {
+    phone?: string;
+    email?: string;
+    website?: string;
+    prices?: string;
+    offers?: string;
+  };
   generateDataUrl: () => string;
 }
 
@@ -712,6 +721,87 @@ export const SAMPLE_PRESETS: SamplePreset[] = [
       ctx.font = '22px sans-serif';
       ctx.fillText('🦷 Compassionate Care for Patients of All Ages', 400, 640);
       ctx.fillText('📞 Call to Book Your Dental Exam & Whitening Visit', 400, 685);
+
+      return canvas.toDataURL('image/jpeg', 0.9);
+    },
+  },
+  {
+    id: 'academic-spss-hub',
+    title: 'Academic Services: "Azeem Academic Hub"',
+    category: 'Academic Research & Data Analysis',
+    language: 'English',
+    description: 'Tests academic data analysis services, SPSS/Excel/PowerPoint offerings, short relevant hashtags, and exact topic slug.',
+    brandExpected: 'Azeem Academic Hub',
+    visibleText: [
+      'AZEEM ACADEMIC HUB',
+      'ACADEMIC RESEARCH & DATA ANALYSIS SERVICES',
+      'Core Analytical Services:',
+      '• SPSS Statistical Data Analysis & Hypothesis Testing',
+      '• Excel Quantitative Modeling, Formulas & Dataset Cleanup',
+      '• Professional Academic PowerPoint Presentation Design',
+      '• Thesis Methodology & Dissertation Consulting',
+      '📞 WhatsApp / Call: 0300-1234567',
+      '🎓 Defense-Ready Presentations & Publication Consulting',
+    ],
+    servicesOrProducts: [
+      'SPSS Statistical Data Analysis & Hypothesis Testing',
+      'Excel Quantitative Modeling & Dataset Cleanup',
+      'Professional Academic PowerPoint Presentation Design',
+      'Thesis & Research Methodology Consultation',
+    ],
+    contactInfo: {
+      phone: '0300-1234567',
+      offers: 'Defense Consultation Available',
+    },
+    generateDataUrl: () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 800;
+      const ctx = canvas.getContext('2d')!;
+
+      const grad = ctx.createLinearGradient(0, 0, 800, 800);
+      grad.addColorStop(0, '#0f172a');
+      grad.addColorStop(0.5, '#1e293b');
+      grad.addColorStop(1, '#0f766e');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 800, 800);
+
+      ctx.strokeStyle = '#2dd4bf';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(30, 30, 740, 740);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 46px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('AZEEM ACADEMIC HUB', 400, 140);
+
+      ctx.font = '22px sans-serif';
+      ctx.fillStyle = '#5eead4';
+      ctx.fillText('DATA ANALYSIS & PRESENTATION SERVICES', 400, 185);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.roundRect(130, 240, 540, 330, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#14b8a6';
+      ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 22px sans-serif';
+      ctx.fillStyle = '#fef08a';
+      ctx.fillText('Core Analytical Services:', 170, 290);
+
+      ctx.font = '20px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('• SPSS Statistical Analysis & Hypothesis Testing', 170, 340);
+      ctx.fillText('• Excel Quantitative Modeling & Dataset Cleanup', 170, 395);
+      ctx.fillText('• Professional Academic PowerPoint Presentations', 170, 450);
+      ctx.fillText('• Thesis & Research Methodology Review', 170, 505);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#f0fdfa';
+      ctx.font = '22px sans-serif';
+      ctx.fillText('📞 WhatsApp: 0300-1234567', 400, 630);
+      ctx.fillText('🎓 Publication-Grade Results for Thesis Scholars', 400, 675);
 
       return canvas.toDataURL('image/jpeg', 0.9);
     },

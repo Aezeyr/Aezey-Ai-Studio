@@ -15,7 +15,14 @@ import { AezeyLogo } from './components/AezeyLogo';
 import { MediaUploader } from './components/MediaUploader';
 import { ResultsDisplay } from './components/ResultsDisplay';
 import { FeaturesShowcase } from './components/FeaturesShowcase';
-import { AnalysisResult, MediaType, TargetPlatform, ContentTone, MarketingFormula } from './types';
+import {
+  AnalysisResult,
+  MediaType,
+  TargetPlatform,
+  ContentTone,
+  MarketingFormula,
+  MediaInspectionData,
+} from './types';
 
 export default function App() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -53,26 +60,36 @@ export default function App() {
     tone: ContentTone;
     formula?: MarketingFormula;
     customInstructions?: string;
+    mediaInspection?: MediaInspectionData;
   }) => {
     setIsAnalyzing(true);
     setErrorMessage(null);
     setLastPayload(payload);
 
-    setAnalysisStep('Initiating multi-modal visual inspection...');
+    setAnalysisStep('Analyzing uploaded media: inspecting visual content & frames...');
 
     try {
-      // Step simulation for responsive feedback
+      const startTime = Date.now();
+
       const stepTimer1 = setTimeout(() => {
-        setAnalysisStep('Scanning for dynamic brand, visible text, and logos...');
-      }, 1200);
+        setAnalysisStep('Scanning visual content: reading visible text, headings, and branding...');
+      }, 700);
 
       const stepTimer2 = setTimeout(() => {
-        setAnalysisStep('Detecting language, pricing, contact details, and offers...');
-      }, 2600);
+        setAnalysisStep('Identifying subject, products, services, and target audience from media...');
+      }, 1500);
 
       const stepTimer3 = setTimeout(() => {
-        setAnalysisStep('Synthesizing captions, hashtags, SEO keywords, and CTAs...');
-      }, 4200);
+        setAnalysisStep('Understanding marketing purpose & applying copywriting formula...');
+      }, 2300);
+
+      const stepTimer4 = setTimeout(() => {
+        setAnalysisStep('Generating human-sounding caption, relevant hashtags & SEO keywords...');
+      }, 3000);
+
+      const stepTimer5 = setTimeout(() => {
+        setAnalysisStep('Building SEO-friendly URL slug & finalizing result...');
+      }, 3600);
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -82,9 +99,17 @@ export default function App() {
         body: JSON.stringify(payload),
       });
 
+      // Ensure user experiences the complete multi-stage analysis sequence (minimum 3.4s pacing)
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 3400) {
+        await new Promise((r) => setTimeout(r, 3400 - elapsed));
+      }
+
       clearTimeout(stepTimer1);
       clearTimeout(stepTimer2);
       clearTimeout(stepTimer3);
+      clearTimeout(stepTimer4);
+      clearTimeout(stepTimer5);
 
       const contentType = response.headers.get('content-type') || '';
       let data: any = null;

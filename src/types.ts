@@ -11,6 +11,23 @@ export type TargetPlatform = 'all' | 'instagram' | 'linkedin' | 'facebook' | 'ti
 
 export type MarketingFormula = 'standard' | 'AIDA' | 'PAS' | 'BAB';
 
+export interface MediaInspectionData {
+  visibleText?: string[];
+  detectedBrand?: string | null;
+  servicesOrProducts?: string[];
+  contactInfo?: {
+    phone?: string;
+    email?: string;
+    website?: string;
+    prices?: string;
+    offers?: string;
+  };
+  colorPalette?: string[];
+  aspectRatio?: string;
+  orientation?: 'portrait' | 'landscape' | 'square';
+  sceneHighlights?: string[];
+}
+
 export interface AnalysisRequest {
   mediaType: MediaType;
   mimeType: string;
@@ -23,6 +40,7 @@ export interface AnalysisRequest {
   tone?: ContentTone;
   formula?: MarketingFormula;
   customInstructions?: string;
+  mediaInspection?: MediaInspectionData;
 }
 
 export interface HashtagGroup {

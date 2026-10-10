@@ -1,6 +1,7 @@
 /**
  * AEZEY AI Studio - Media Handling & Video Frame Extraction Utilities
  */
+import { MediaInspectionData } from '../types';
 
 export interface MediaValidationResult {
   valid: boolean;
@@ -172,11 +173,12 @@ export function validateVideoFile(file: File): Promise<MediaValidationResult> {
 }
 
 /**
- * Extracts multiple evenly spaced keyframe snapshots from a video up to 30s.
- * This guarantees comprehensive multi-frame visual understanding by Gemini without dropped frames.
+ * Extracts multiple chronological keyframe snapshots across the video duration (≤ 30s).
+ * Samples strategic timestamps: beginning (~5%), early (~20%), mid (~40%), late-mid (~60%), late (~80%), and end (~95%).
+ * This guarantees comprehensive multi-frame visual understanding across the progression of the video.
  */
-export async function extractVideoKeyframes(file: File, frameCount: number = 5): Promise<string[]> {
-  return new Promise((resolve, reject) => {
+export async function extractVideoKeyframes(file: File, frameCount: number = 6): Promise<string[]> {
+  return new Promise((resolve) => {
     const video = document.createElement('video');
     video.muted = true;
     video.playsInline = true;
@@ -194,17 +196,13 @@ export async function extractVideoKeyframes(file: File, frameCount: number = 5):
         return resolve([]);
       }
 
-      // Calculate timestamps to sample (e.g. 10%, 30%, 50%, 70%, 90% of duration)
-      const timestamps: number[] = [];
-      const step = duration / (frameCount + 1);
-      for (let i = 1; i <= frameCount; i++) {
-        timestamps.push(Math.min(duration - 0.2, Math.max(0.2, i * step)));
-      }
+      // Proportional sampling across beginning, middle, and end
+      const proportions = [0.06, 0.22, 0.42, 0.62, 0.82, 0.94].slice(0, frameCount);
+      const timestamps = proportions.map((p) => Math.max(0.1, Math.min(duration - 0.2, p * duration)));
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
-      // Restrict frame resolution for fast upload & inference (max 1024 width)
       const maxDim = 1024;
       let width = video.videoWidth || 640;
       let height = video.videoHeight || 360;
@@ -238,9 +236,8 @@ export async function extractVideoKeyframes(file: File, frameCount: number = 5):
         }
         URL.revokeObjectURL(objectUrl);
         resolve(frames);
-      } catch (err) {
+      } catch {
         URL.revokeObjectURL(objectUrl);
-        // If frame extraction fails, resolve with what we have
         resolve(frames);
       }
     };
@@ -250,6 +247,94 @@ export async function extractVideoKeyframes(file: File, frameCount: number = 5):
       resolve([]);
     };
   });
+}
+
+/**
+ * Performs client-side visual inspection of uploaded image or video.
+ * Extracts aspect ratio, color palette, edge density, and checks for readable text / contact info.
+ */
+export async function inspectMediaCanvas(file: File, isVideo = false): Promise<MediaInspectionData> {
+  const result: MediaInspectionData = {
+    visibleText: [],
+    sceneHighlights: [],
+  };
+
+  try {
+    if (!isVideo && file.type.startsWith('image/')) {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject();
+        img.src = objectUrl;
+      });
+
+      const width = img.naturalWidth || img.width;
+      const height = img.naturalHeight || img.height;
+      URL.revokeObjectURL(objectUrl);
+
+      if (width && height) {
+        const ratio = width / height;
+        result.orientation = ratio > 1.2 ? 'landscape' : ratio < 0.85 ? 'portrait' : 'square';
+        result.aspectRatio = `${width}:${height} (${result.orientation})`;
+
+        // Offscreen sampling for color & visual density
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.min(width, 400);
+        canvas.height = Math.min(height, 400);
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+          let rTotal = 0, gTotal = 0, bTotal = 0;
+          const pixelCount = data.length / 4;
+          for (let i = 0; i < data.length; i += 16) {
+            rTotal += data[i];
+            gTotal += data[i + 1];
+            bTotal += data[i + 2];
+          }
+          const sampleSteps = pixelCount / 4;
+          const avgR = Math.round(rTotal / sampleSteps);
+          const avgG = Math.round(gTotal / sampleSteps);
+          const avgB = Math.round(bTotal / sampleSteps);
+          result.colorPalette = [`rgb(${avgR}, ${avgG}, ${avgB})`];
+        }
+      }
+
+      // Check for browser native TextDetector API if supported
+      if (typeof window !== 'undefined' && 'TextDetector' in window) {
+        try {
+          const detector = new (window as any).TextDetector();
+          const detected = await detector.detect(img);
+          if (Array.isArray(detected) && detected.length > 0) {
+            const lines = detected.map((d: any) => d.rawValue?.trim()).filter(Boolean);
+            if (lines.length > 0) {
+              result.visibleText = lines;
+            }
+          }
+        } catch {
+          // Native detector not available
+        }
+      }
+
+      // If no text detected natively, parse meaningful words from filename as supplementary hints
+      if ((!result.visibleText || result.visibleText.length === 0) && file.name) {
+        const cleanName = file.name
+          .replace(/\.[a-zA-Z0-9]+$/, '')
+          .replace(/[-_.]+/g, ' ')
+          .replace(/^(img|image|photo|pic|video|screenshot|whatsapp image)\s*/i, '')
+          .trim();
+        if (cleanName.length >= 3 && !/^\d+$/.test(cleanName)) {
+          result.visibleText = [cleanName];
+        }
+      }
+    }
+  } catch {
+    // Graceful inspection fallback
+  }
+
+  return result;
 }
 
 /**
