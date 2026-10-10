@@ -71,7 +71,7 @@ const RESPONSE_SCHEMA = {
     urlSlug: {
       type: Type.STRING,
       description:
-        'Clean SEO-friendly lowercase kebab-case URL slug based strictly on the uploaded media topic, e.g. digital-marketing-tips',
+        'Clean SEO-friendly lowercase kebab-case URL slug based strictly on the uploaded media topic, e.g. academic-research-methods or cushioned-running-shoes',
     },
     hashtags: {
       type: Type.OBJECT,
@@ -79,33 +79,33 @@ const RESPONSE_SCHEMA = {
         industry: {
           type: Type.ARRAY,
           items: { type: Type.STRING },
-          description: 'High-volume searchable industry category tags for social SEO discoverability',
+          description: 'Short, relevant industry tags strictly matching the uploaded media content',
         },
         niche: {
           type: Type.ARRAY,
           items: { type: Type.STRING },
-          description: 'High-intent niche and long-tail search tags matching specific visual details',
+          description: 'Short, specific niche tags matching exact visual details in the uploaded media',
         },
         topic: {
           type: Type.ARRAY,
           items: { type: Type.STRING },
-          description: 'Trending and searchable topic tags representing the media theme',
+          description: 'Short topic tags representing the actual subject of the uploaded media',
         },
         audience: {
           type: Type.ARRAY,
           items: { type: Type.STRING },
-          description: 'Searchable community and audience persona tags that target buyers look up',
+          description: 'Short community and audience tags that look up this exact product, service, or subject',
         },
         productService: {
           type: Type.ARRAY,
           items: { type: Type.STRING },
-          description: 'Searchable tags reflecting the specific product or service shown in the media',
+          description: 'Short tags reflecting the exact product, dish, garment, or service shown in the media',
         },
         location: { type: Type.ARRAY, items: { type: Type.STRING } },
         all: {
           type: Type.ARRAY,
           items: { type: Type.STRING },
-          description: '20-30 highly relevant, searchable SEO hashtags for maximum visibility across algorithms',
+          description: 'Curated list of short, relevant hashtags strictly related to the actual uploaded media. No overly long tags, no unrelated trendy tags, no app names, no formula tags.',
         },
       },
       required: ['industry', 'niche', 'topic', 'all'],
@@ -119,7 +119,11 @@ const RESPONSE_SCHEMA = {
         audience: { type: Type.ARRAY, items: { type: Type.STRING } },
         brand: { type: Type.ARRAY, items: { type: Type.STRING } },
         searchIntent: { type: Type.ARRAY, items: { type: Type.STRING } },
-        all: { type: Type.ARRAY, items: { type: Type.STRING } },
+        all: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: 'High-intent SEO keywords based strictly on the uploaded media topic. Never include unrelated trendy keywords or app names unless in the media.',
+        },
       },
       required: ['mainTopic', 'industry', 'all'],
     },
@@ -178,14 +182,57 @@ function extractJsonString(raw: string): string {
 }
 
 /**
- * Formats tags ensuring '#' prefix, no spaces, and filters out application name tags and formula structural tags
+ * Scans base64 image or video frame payload for readable ASCII/UTF-8 text embedded in metadata, headers, EXIF, or comments
+ */
+export function extractReadableTextFromMediaBuffer(base64Data?: string): string[] {
+  if (!base64Data) return [];
+  try {
+    const clean = base64Data.replace(/^data:[^;]+;base64,/, '');
+    let rawStr = '';
+    if (typeof Buffer !== 'undefined') {
+      const buf = Buffer.from(clean, 'base64');
+      rawStr = buf.toString('latin1');
+    } else if (typeof atob === 'function') {
+      rawStr = atob(clean);
+    }
+    if (!rawStr) return [];
+
+    // Extract ASCII printable sequences of length 4 to 60 that look like meaningful readable words
+    const matches = rawStr.match(/[A-Za-z0-9\s.,!?:;'\-\/()]{4,60}/g) || [];
+    const validPhrases = matches
+      .map((m) => m.trim())
+      .filter((m) => {
+        if (!/[A-Za-z]{2,}/.test(m)) return false;
+        // Skip common image binary marker artifacts like JFIF, Exif, Photoshop, ICC_PROFILE, etc.
+        if (/^(JFIF|Exif|Photoshop|ICC_PROFILE|Adobe|Ducky|XML:|http:\/\/|AppleMark|XMP)/i.test(m)) return false;
+        const asciiLetters = (m.match(/[a-zA-Z]/g) || []).length;
+        return asciiLetters / m.length > 0.6;
+      })
+      .slice(0, 8);
+
+    return Array.from(new Set(validPhrases));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Formats tags ensuring '#' prefix, no spaces, short length (<=26 chars),
+ * and strictly filters out application name tags, formula structural tags, and unrelated generic trendy tags.
  */
 function formatTags(tags: string[]): string[] {
   if (!Array.isArray(tags)) return [];
   return tags
     .map((t) => (t.startsWith('#') ? t : `#${t.replace(/\s+/g, '')}`))
     .filter((t) => !/^#(aezey|aezeyai|aezeyaistudio|aistudio|studio|aezeystudio|ai_studio|aezey_ai_studio)$/i.test(t))
-    .filter((t) => !/^#(aida|aidaformula|aidamodel|pas|pasformula|pasmodel|bab|babformula|babmodel|formula|marketingformula)$/i.test(t));
+    .filter((t) => !/^#(aida|idap|pas|eas|bab|aidaformula|pasformula|babformula|formula|marketingformula)$/i.test(t))
+    .filter(
+      (t) =>
+        !/^#(trendingnow|viralfinds|thingsyouneed|foryoupage|fyp|explorepage|musthaves|lifestyleupgrade|customerfavorites|toprated|discovermore|dailyessentials|qualityfirst)$/i.test(
+          t
+        )
+    )
+    .filter((t) => t.length > 2 && t.length <= 26);
 }
 
 /**
@@ -456,46 +503,50 @@ export async function analyzeContent(
   const promptText = `
 You are the advanced content analysis engine of "AEZEY AI Studio".
 
-CORE MEDIA ANALYSIS & SEO INSTRUCTIONS:
-1. ANALYZE ACTUAL MEDIA CONTENT: Thoroughly examine the visual elements of the uploaded image or video frames (subject, setting, apparel, products, materials, people, activities, aesthetic style).
-2. NATURAL CAPTIONS WITH SMOOTH KEYWORD INTEGRATION: Write engaging, fluent social media captions tailored to the platform. Naturally incorporate high-intent search keywords and descriptive terms smoothly into the copy without awkward phrasing.
-3. SEO-FRIENDLY & HIGHLY SEARCHABLE HASHTAGS (MAXIMUM DISCOVERABILITY & VISIBILITY):
-   - Generate hashtags engineered for social search SEO and maximum organic discoverability across search algorithms (Instagram Search, TikTok SEO, YouTube, LinkedIn, X/Twitter, and Google Search).
-   - Every hashtag must be a searchable, high-intent term or popular query that target buyers, viewers, or clients actively type into social search bars.
-   - Provide an extensive, curated collection of 20 to 30 hashtags in the "all" field, covering:
-     * High-volume primary category and industry search terms
-     * Mid-tail and long-tail niche search tags matching exact visual details
-     * Product/service-specific search tags (the exact product type, dish, garment, software, or service shown)
-     * Target audience community and lifestyle search tags
-   - STRICT RULE: NEVER include the application name in hashtags (DO NOT generate #AEZEY, #AEZEYAIStudio).
-   - STRICT RULE: NEVER include formula names or structural labels in hashtags (DO NOT generate #AIDA, #AIDAFormula, #PAS, #PASFormula, #BAB, #BABFormula).
-4. SEO-FRIENDLY URL SLUG: Generate a clean, search-optimized URL slug (e.g., "digital-marketing-tips", "urban-streetwear-sneakers-drop", "luxury-minimalist-living-room") in lowercase kebab-case representing the uploaded content's primary topic, suitable for blog articles or landing pages.
-5. ADHERE TO USER SPECIAL INSTRUCTIONS WITHOUT ECHOING: If the user provides custom special instructions below, faithfully and strictly implement their formatting and stylistic requests (e.g., formatting features or services into bullet points, sentence length, tone nuance, emojis). NEVER quote, copy, or print the instruction text itself into the caption.
-${formula && formula !== 'standard' ? `
-MARKETING COPYWRITING FORMULA DIRECTIVE:
-The user explicitly requested the "${formula}" marketing formula. You MUST craft the copy following this formula's persuasive psychological arc while strictly adhering to the following rules:
+CORE MEDIA ANALYSIS & CONTENT GENERATION DIRECTIVES (HIGHEST PRIORITY):
+1. FIRST, CAREFULLY ANALYZE THE ACTUAL MEDIA CONTENT:
+   - Identify the main subject, topic, services, products, and any readable text in the image or video frames.
+   - Note the exact product, craft, garment, dish, academic theme, business offering, materials, setting, and readable signage/branding.
+   - If text, numbers, offers, or brand logos are visible, transcribe them accurately. Do NOT invent brands or products not shown.
+   - Ground all generated content strictly on this visual analysis.
 
-ABSOLUTE REQUIREMENTS FOR FORMULA OUTPUT:
-- NO HEADINGS, LABELS, OR STRUCTURAL TAGS: Write the entire caption as a natural, human-like paragraph (or cohesive paragraphs) WITHOUT ANY headings, labels, section titles, prefixes, or structural tags. NEVER output words like "Attention:", "Interest:", "Desire:", "Action:", "Problem:", "Agitate:", "Solution:", "Before:", "After:", "Bridge:", or any brackets/markdown tags like "**Attention:**" or "[Problem]".
-- NATURAL, HUMAN-LIKE WRITING: The copy must read conversationally and smoothly like a real human copywriter wrote it. The persuasive phases of ${formula} must blend seamlessly into each other without feeling rigid or segmented.
-- STRICT USER FORMATTING & STYLISTIC COMPLIANCE: If the user specified special instructions (e.g., formatting services or features into bullet points, line breaks, emojis, concise length), you MUST strictly follow those formatting and stylistic directives while still applying the underlying ${formula} psychological progression.
+2. GENERATE A NATURAL, HUMAN-SOUNDING CAPTION MATCHING THE UPLOADED CONTENT:
+   - Write fluent, natural social media copy that speaks specifically about the exact uploaded content, products, or services.
+   - Do NOT use generic, unrelated templates or boilerplate filler.
+   - The writing must feel authentic, relatable, and human—like a real copywriter or passionate creator wrote it.
+
+3. SHORT, RELEVANT HASHTAGS DIRECTLY RELATED TO ACTUAL UPLOADED CONTENT:
+   - Generate short, relevant hashtags directly related to the actual uploaded content.
+   - Do NOT create unrelated hashtags (NEVER output generic viral tags like #TrendingNow, #ViralFinds, #ThingsYouNeed, #ForYouPage, #ExplorePage, #MustHaves, #LifestyleUpgrade).
+   - Do NOT create overly long hashtags (keep each hashtag concise and searchable).
+   - STRICT RULE: NEVER include the application name in hashtags (DO NOT generate #AEZEY, #AEZEYAIStudio).
+   - STRICT RULE: NEVER include copywriting formula names or structural labels in hashtags (DO NOT generate #AIDA, #IDAP, #PAS, #EAS, #BAB, #Formula).
+
+4. RELEVANT KEYWORDS & SEO-FRIENDLY URL SLUG STRICTLY ON MEDIA TOPIC:
+   - Generate high-intent SEO keywords based strictly on the uploaded media topic, subject, and service/product identified.
+   - Do NOT use unrelated trendy keywords (e.g., do NOT generate "digital marketing", "content creation", or "multimedia design" unless the uploaded content is specifically about digital marketing).
+   - Generate a clean, SEO-friendly lowercase kebab-case URL slug based strictly on the uploaded media topic (e.g., "academic-research-study-guide", "cushioned-running-shoes", "artisan-homemade-pasta-recipe", "urban-streetwear-summer-collection").
+
+5. ADHERE TO USER SPECIAL INSTRUCTIONS STRICTLY AS FORMATTING:
+   - If the user provides optional special instructions (e.g. "keep my services in bullet points", "use 2 concise paragraphs"), follow them strictly as FORMATTING and STYLISTIC directives.
+   - NEVER copy, quote, echo, or print the instruction text itself into the caption.
+${formula && formula !== 'standard' ? `
+6. PERSUASIVE COPYWRITING FORMULA DIRECTIVE (${formula}):
+The user explicitly requested the "${formula}" copywriting formula. Craft the copy following this formula's persuasive psychological progression while strictly adhering to:
+- NO HEADINGS, LABELS, OR STRUCTURAL TAGS: Write the entire caption as a natural, human-like paragraph (or bullet points if requested by special instructions) WITHOUT ANY headings, labels, section titles, or structural tags. NEVER output words like "Attention:", "Interest:", "Desire:", "Action:", "Problem:", "Agitate:", "Solution:", "Before:", "After:", "Bridge:", or any brackets/markdown tags like "**Attention:**" or "[Problem]".
+- NATURAL, HUMAN-LIKE WRITING: Blend the phases seamlessly into flowing, conversational prose.
+- STRICT USER FORMATTING COMPLIANCE: If the user specified bullet points or list format, integrate the product/service features smoothly in bullet points while applying the ${formula} arc.
 
 ${formula === 'AIDA' ? `
 AIDA ARC (PRODUCT/SERVICE REFLECTION, CASUAL & NATURAL TONE, DIRECT AUDIENCE ATTRACTION):
-- REFLECT SPECIFIC PRODUCT OR SERVICE: Identify the exact product, service, craft, dish, apparel, tech, or offering showcased in the uploaded media. Center the entire caption around this specific product/service—highlighting its real-world utility, standout qualities, craftsmanship, materials, or deliverables. Avoid vague generalities.
-- DIRECTLY ATTRACT TARGET AUDIENCE: Hook the ideal target audience right away with an opening that speaks straight to them ("you", "your", "if you're looking for...", "creators who want...", "for anyone needing..."). Directly touch on their desires, everyday needs, or taste.
-- CASUAL AND NATURAL HUMAN TONE: The writing must feel relaxed, approachable, conversational, and genuinely human—like a trusted friend, creator, or insider enthusiastically recommending something great. Avoid stiff corporate jargon, robotic claims, or hyper-formal business speak.
-- SEAMLESS ATTENTION • INTEREST • DESIRE • ACTION PROGRESSION:
-  1. (Attention): A casual, magnetic hook spotlighting the product/service and calling out the target audience.
-  2. (Interest): Intriguing details, unique characteristics, or relatable context about how the product/service works.
-  3. (Desire): The tangible benefits, sensory appeal, transformation, or everyday satisfaction it provides.
-  4. (Action): A friendly, casual call to action inviting them to try, order, click the bio link, save, or comment.
-- NO STRUCTURAL HEADINGS: Blend all four phases into seamless, flowing natural prose with ZERO headings or labels.
+- Identify the exact product, service, dish, apparel, or offering in the media and center the entire caption around it.
+- Directly attract the target audience with a casual, magnetic opening that speaks to their lifestyle or everyday needs.
+- Walk through Attention -> Interest -> Desire -> Action naturally with zero formula labels.
 ` : formula === 'PAS' ? `
 PAS ARC (Apply naturally without ANY headings or labels):
 - Open by identifying a relatable, genuine problem or frustration your audience faces.
-- Empathize and agitate why putting up with this frustration is exhausting, costly, or limiting.
-- Unveil the subject in the media as the clear, natural solution and answer, closing with an enticing CTA.
+- Empathize and agitate why putting up with this frustration is exhausting.
+- Unveil the subject in the media as the clear, natural solution and close with an enticing CTA.
 ` : `
 BAB ARC (Apply naturally without ANY headings or labels):
 - Open with the relatable baseline reality or struggle before discovering this solution.
@@ -746,100 +797,1021 @@ export function generateIntelligentFallback(
     customInstructions = '',
   } = payload;
 
+  // 1. Analyze media content: extract readable text from buffer/metadata
+  const bufferText = extractReadableTextFromMediaBuffer(payload.base64Data);
+  const bufferString = bufferText.join(' ').toLowerCase();
+
   const cleanFileName = (fileName || '').toLowerCase();
   const cleanInstructions = (customInstructions || '').toLowerCase();
+  // Normalize punctuation and separators (underscores, dashes, dots) to spaces so regex word boundaries match reliably
+  const normalizedWords = `${bufferString} ${cleanFileName} ${cleanInstructions}`
+    .replace(/[_\-./\\+&%#@!,;:?"'()]+/g, ' ')
+    .toLowerCase();
+  const combinedContext = `${bufferString} ${cleanFileName} ${cleanInstructions} ${normalizedWords}`.trim();
 
-  // 1. Detect if Digital Marketing context
+  // Normalize formula: support AIDA (or IDAP), PAS (or EAS), BAB, and standard
+  const rawFormula = (formula || '').toUpperCase().trim();
+  const normalizedFormula: 'AIDA' | 'PAS' | 'BAB' | 'standard' =
+    rawFormula === 'IDAP' || rawFormula === 'AIDA'
+      ? 'AIDA'
+      : rawFormula === 'EAS' || rawFormula === 'PAS'
+      ? 'PAS'
+      : rawFormula === 'BAB'
+      ? 'BAB'
+      : 'standard';
+
+  const wantsBulletPoints = /bullet|points|list|service/i.test(cleanInstructions);
+
+  // 2. Identify content type from actual media cues, extracted text, filename, and instructions
+  const isAcademic =
+    /\b(academic|study|research|university|college|thesis|exam|tuition|scholar|paper|physics|math|science|biology|curriculum|textbook|dissertation|lecture|education)\b/i.test(
+      combinedContext
+    ) && !combinedContext.includes('roshan') && !combinedContext.includes('urdu');
+
+  const isShoes =
+    /\b(shoe|shoes|sneaker|sneakers|footwear|kicks|boots|boot|loafer|loafers|heels|sandals|running[- ]?shoe|athletic[- ]?shoe|trainer|soles|slides)\b/i.test(
+      combinedContext
+    );
+
+  const isClothing =
+    !isShoes &&
+    /\b(cloth|clothing|apparel|wear|streetwear|jacket|hoodie|dress|dresses|shirt|shirts|denim|outfit|boutique|garment|fashion|t-shirt|sweatshirt|wardrobe|linen)\b/i.test(
+      combinedContext
+    );
+
+  const isCooking =
+    /\b(cook|cooking|recipe|recipes|kitchen|baking|pasta|chef|culinary|dinner|dish|dishes|meal|gourmet|flavor|spices|sauce|bbq|grill|breakfast|dessert|biryani)\b/i.test(
+      combinedContext
+    ) && !combinedContext.includes('karachi bites');
+
+  const isSocialMediaMarketing =
+    /\b(social media|smm|reels strategy|content strategy|instagram growth|social agency|social media manager|tiktok ads|meta ads|social strategy|instagram marketing)\b/i.test(
+      combinedContext
+    );
+
+  const isCoffee =
+    /\b(coffee|cafe|espresso|latte|roast|barista|brew|cappuccino|bakery|pastry)\b/i.test(
+      combinedContext
+    );
+
+  const isFitness =
+    /\b(fitness|gym|workout|personal trainer|training|crossfit|bodybuilding|muscle|exercise|strength training)\b/i.test(
+      combinedContext
+    );
+
+  const isDental =
+    /\b(dental|dentist|teeth|smile|orthodontic|oral health|teeth whitening|clinic|dentistry)\b/i.test(
+      combinedContext
+    );
+
+  const isAuto =
+    /\b(auto|car|mechanic|vehicle|automotive|repair|brake|oil change|tires|dealership)\b/i.test(
+      combinedContext
+    );
+
+  const isRealEstate =
+    /\b(real estate|property|realtor|housing|house|apartment|luxury home|condo|residential|property listing)\b/i.test(
+      combinedContext
+    );
+
   const isDigitalMarketing =
-    cleanFileName.includes('digital') ||
-    cleanFileName.includes('marketing') ||
-    cleanFileName.includes('seo') ||
-    cleanFileName.includes('growth-agency') ||
-    cleanInstructions.includes('marketing') ||
-    cleanInstructions.includes('digital') ||
-    cleanInstructions.includes('seo');
+    !isSocialMediaMarketing &&
+    (/\b(digital marketing|seo|growth-agency|apex growth|conversion funnels)\b/i.test(combinedContext) ||
+      cleanFileName.includes('digital'));
 
-  // 2. Detect if Tech / SaaS / Nexus AI context
   const isTechnology =
-    cleanFileName.includes('nexus') ||
-    cleanFileName.includes('tech') ||
-    cleanFileName.includes('saas') ||
-    cleanFileName.includes('cloud') ||
-    cleanFileName.includes('software') ||
-    cleanInstructions.includes('tech') ||
-    cleanInstructions.includes('software') ||
-    cleanInstructions.includes('saas');
+    /\b(nexus|tech|saas|cloud|software|devops|api connectors|infrastructure)\b/i.test(
+      combinedContext
+    );
 
-  // 3. Detect if ABC Fashion or Fashion context
-  const isFashion =
-    cleanFileName.includes('fashion') ||
-    cleanFileName.includes('abc') ||
-    cleanFileName.includes('cloth') ||
-    cleanFileName.includes('wear') ||
-    cleanInstructions.includes('fashion') ||
-    cleanInstructions.includes('clothing');
-
-  // 4. Detect if Urdu Academy or Urdu Education context
   const isUrduAcademy =
-    cleanFileName.includes('urdu') ||
-    cleanFileName.includes('academy') ||
-    cleanFileName.includes('roshan') ||
-    cleanInstructions.includes('urdu') ||
-    cleanInstructions.includes('academy') ||
-    cleanInstructions.includes('تعلیم');
+    /\b(urdu|academy|roshan|تعلیم|لاہور)\b/i.test(combinedContext);
 
-  // 5. Detect if Karachi Bites or Food / Restaurant context
   const isFood =
-    cleanFileName.includes('biryani') ||
-    cleanFileName.includes('food') ||
-    cleanFileName.includes('karachi') ||
-    cleanFileName.includes('bites') ||
-    cleanFileName.includes('restaurant') ||
-    cleanInstructions.includes('food') ||
-    cleanInstructions.includes('biryani') ||
-    cleanInstructions.includes('restaurant');
+    /\b(biryani|karachi|bites|karachi bites|dhamaka deal)\b/i.test(combinedContext);
 
+  // --- DOMAIN 1: ACADEMIC & RESEARCH ---
+  if (isAcademic) {
+    let acadPrimary = '';
+    let acadAlt = '';
+
+    if (normalizedFormula === 'AIDA') {
+      acadPrimary = wantsBulletPoints
+        ? 'Struggling to balance heavy coursework, research deadlines, and exam prep without burning out? Our comprehensive academic research and study framework is designed specifically for students, researchers, and lifelong learners who want clear comprehension and top grades. Here is how we transform your academic workflow:\n\n• Structured Literature Review & Citation Frameworks for faster paper drafting\n• High-Yield Exam Preparation Blueprints simplifying complex concepts\n• Active Recall & Spaced Repetition Study Schedules tailored to your syllabus\n• One-on-One Academic Mentorship for research papers and thesis defense\n\nGain full mastery over your subjects and walk into every exam with complete confidence. Save this study guide and click the link in our bio to access our free academic templates today!'
+        : 'Struggling to balance heavy coursework, research deadlines, and exam prep without burning out? Our academic research and study framework is designed specifically for students, researchers, and learners who want deep subject comprehension and top grades. By combining structured literature analysis with active recall blueprints and thesis frameworks, we help you master complex topics in half the time. Gain full confidence in your coursework and leave last-minute cramming behind. Save this post and tap the link in our bio to download our free study toolkit!';
+      acadAlt =
+        'Transform your university study routine with proven research and exam prep frameworks. Master complex course material without all-nighter stress. Save this post and tap the bio link for our free academic guide.';
+    } else if (normalizedFormula === 'PAS') {
+      acadPrimary = wantsBulletPoints
+        ? 'Drowning in endless textbook chapters, fragmented lecture notes, and looming paper deadlines is exhausting. When you spend hours studying without retaining core concepts, exam anxiety builds and academic burnout sets in. Our structured academic framework solves that frustration directly:\n\n• Clear Synthesis Blueprints breaking down dense scholarly papers into key insights\n• Active Recall Question Banks targeted at highest-weight exam topics\n• Step-by-Step Thesis Formatting and citation management systems\n• Proven Revision Timelines that prevent last-minute cramming\n\nTake control of your academic journey today—tap the bio link to download your study plan!'
+        : 'Drowning in endless textbook chapters, fragmented lecture notes, and looming paper deadlines is exhausting. When you spend hours studying without retaining core concepts, exam anxiety builds and academic burnout sets in. Our structured academic framework solves that frustration directly with active recall blueprints, synthesis systems, and revision timelines. Reclaim your confidence and study smarter. Save this post and tap the bio link to get started!';
+      acadAlt =
+        'Overwhelmed by dense academic papers and exam stress? Don\'t let study burnout derail your semester. Learn how structured research methods deliver clarity and top results. Tap the link in bio for the guide.';
+    } else if (normalizedFormula === 'BAB') {
+      acadPrimary = wantsBulletPoints
+        ? 'Feeling buried under stacks of unread papers, confusing formulas, and chaotic study sessions is overwhelming. Imagine approaching finals week with complete clarity, crisp summary notes, and the confidence that every major concept is locked in. Our academic research methodology bridges that gap effortlessly:\n\n• Concept Mapping Frameworks linking complex theories to clear practical examples\n• Accelerated Literature Synthesis reducing research reading time by half\n• High-Retention Revision Protocols ensuring long-term memory\n• Thesis and Essay Templates formatted for top academic standards\n\nStep into stress-free academic excellence today—save this post and visit our bio link for full study resources!'
+        : 'Feeling buried under stacks of unread papers, confusing formulas, and chaotic study sessions is overwhelming. Imagine approaching finals week with complete clarity, crisp summary notes, and the confidence that every major concept is locked in. Our academic research methodology bridges that gap effortlessly through accelerated synthesis, concept maps, and high-retention revision protocols. Step into stress-free academic excellence—save this post and check the link in our bio!';
+      acadAlt =
+        'Move from chaotic cramming to calm academic confidence. Structured research frameworks bridge the gap to top grades and deeper comprehension. Tap the bio link to explore our academic guides.';
+    } else if (wantsBulletPoints) {
+      acadPrimary =
+        'Master your academic coursework and research projects with clarity and focus. Here are key pillars for academic success:\n\n• Evidence-Based Active Recall and spaced repetition revision\n• Systematic Literature Reviews for scholarly research papers\n• Structured Problem Solving for STEM and quantitative exams\n• Clear Academic Writing and thesis defense preparation\n\nSave this post for your next study session and share with a fellow student!';
+      acadAlt =
+        'Elevate your study habits with structured research methods and active recall techniques. Tap the link in bio to read the complete academic study guide.';
+    } else {
+      acadPrimary =
+        'Master your academic coursework and research projects with clarity and focus. Combining active recall study routines with structured literature synthesis is the proven path to deep subject comprehension and stress-free exams.\n\nSave this guide for your next study session and share your favorite study technique in the comments!';
+      acadAlt =
+        'Elevate your study habits with structured research methods and active recall techniques. Tap the link in bio to read the complete academic study guide.';
+    }
+
+    const acadTags = formatTags([
+      '#AcademicWriting', '#ResearchPaper', '#StudyTips', '#CollegeLife',
+      '#ExamPrep', '#StudentSuccess', '#StudyGram', '#Academia',
+      '#HigherEd', '#StudyMotivation', '#UniversityLife', '#ResearchLife',
+    ]);
+
+    return {
+      id: 'aezey_acd_' + Date.now().toString(36),
+      timestamp: Date.now(),
+      urlSlug: 'academic-research-study-guide',
+      primaryCaption: stripFormulaLabels(stripInstructionEcho(acadPrimary, customInstructions)),
+      alternativeCaption: stripFormulaLabels(stripInstructionEcho(acadAlt, customInstructions)),
+      hashtags: {
+        industry: ['#Education', '#Academia', '#HigherEd', '#StudyGram'],
+        niche: ['#AcademicWriting', '#ResearchPaper', '#ExamPrep', '#ThesisWriting'],
+        topic: ['#StudyTips', '#StudentSuccess', '#ResearchMethods', '#CollegeLife'],
+        audience: ['#CollegeStudents', '#GradStudents', '#Researchers', '#LifelongLearners'],
+        productService: ['#StudyGuide', '#AcademicCoaching', '#ResearchTools'],
+        location: ['#CampusLife'],
+        all: acadTags,
+      },
+      seoKeywords: {
+        mainTopic: ['academic research methods', 'university study guide', 'scholarly paper analysis'],
+        productService: ['academic coaching services', 'thesis preparation guide', 'student exam blueprint'],
+        industry: ['higher education research', 'academic publishing', 'scholarly writing'],
+        audience: ['university students', 'graduate researchers', 'academic scholars'],
+        brand: ['Academic Research Guide'],
+        searchIntent: ['how to write academic research paper', 'best university study tips', 'exam preparation strategies college'],
+        all: [
+          'academic research methods', 'university study guide', 'scholarly paper analysis',
+          'academic coaching services', 'thesis preparation guide', 'student exam blueprint',
+          'higher education research', 'academic publishing', 'scholarly writing',
+          'university students', 'graduate researchers', 'academic scholars',
+          'how to write academic research paper', 'best university study tips', 'exam preparation strategies college',
+        ],
+      },
+      callToAction: 'Save this study guide for finals week and click the link in our bio for full research templates!',
+      contentSummary: `In-depth academic research and university study methodology structured in ${normalizedFormula} format highlighting active recall and structured synthesis.`,
+      detectedContext: {
+        detectedBrand: null,
+        hasBrand: false,
+        visibleText: bufferText.length > 0 ? bufferText : ['Academic Research & Study Guide', 'Higher Education Methods'],
+        detectedLanguage: 'English',
+        tone,
+        mainTopic: 'Academic Research, University Coursework & Study Strategies',
+        promotionalIntent: 'Educational',
+        targetAudience: 'University students, graduate researchers, educators, and scholars',
+        visualHighlights: [
+          'Scholarly educational context with structured methodology',
+          'Clear actionable study pillars and active recall framework',
+          'Optimized for student engagement and academic research discovery',
+        ],
+      },
+      platform,
+      tone,
+      formula: normalizedFormula,
+      isSimulatedFallback: true,
+      authNotice: notice,
+    };
+  }
+
+  // --- DOMAIN 2: SHOES & FOOTWEAR ---
+  if (isShoes) {
+    let shoePrimary = '';
+    let shoeAlt = '';
+
+    if (normalizedFormula === 'AIDA') {
+      shoePrimary = wantsBulletPoints
+        ? 'If you\'ve been hunting for athletic sneakers that look incredible on the street while keeping your feet cushioned all day, your search ends here. Designed for runners, athletes, and daily commuters who refuse to compromise between responsive comfort and modern design, here is what makes these sneakers stand out:\n\n• High-Rebound Dual-Density Foam Cushioning for plush, impact-absorbing strides\n• Breathable Engineered Mesh Upper engineered for maximum all-day ventilation\n• Ergonomic Arch Support that stabilizes posture and prevents foot fatigue\n• High-Traction Rubber Outsole built for durable multi-surface grip\n\nFeel the difference of true all-day support from your morning run to evening commute. Tap the link in our bio to find your size or drop your favorite colorway in the comments!'
+        : 'If you\'ve been hunting for athletic sneakers that look incredible on the street while keeping your feet cushioned all day, your search ends here. Crafted for runners, athletes, and daily commuters who refuse to compromise between performance and clean style, these shoes pair high-rebound foam with breathable engineered mesh. Experience plush impact protection and all-day energy return with every stride. Step up your footwear rotation today—tap the link in our bio to shop the collection!';
+      shoeAlt =
+        'Experience peak comfort and effortless athletic style with our high-rebound running sneakers. Engineered for breathable support on every run and commute. Tap the bio link to order.';
+    } else if (normalizedFormula === 'PAS') {
+      shoePrimary = wantsBulletPoints
+        ? 'Stiff soles, sore arches, and heavy sneakers that leave your feet aching after just a few hours ruin your day. Settling for uncomfortable shoes leads to fatigue and cuts your workouts short. Our high-performance cushioned running shoes solve that problem completely:\n\n• Ultra-Lightweight Construction eliminating unnecessary foot drag\n• Responsive Shock-Absorbing Midsoles protecting your joints on hard pavement\n• Seamless Anti-Blister Interior Lining engineered for glove-like comfort\n• Reinforced Heel Cup providing secure lateral stability\n\nSay goodbye to aching feet and upgrade to all-day comfort—click the link in our bio to shop now!'
+        : 'Stiff soles, sore arches, and heavy sneakers that leave your feet aching after a few hours ruin your day. Settling for uncomfortable shoes causes fatigue and cuts your stride short. Our cushioned running sneakers solve that problem completely with high-rebound shock absorption and breathable engineered support. Say goodbye to foot fatigue—tap the link in our bio to grab your pair today!';
+      shoeAlt =
+        'Tired of sore feet and heavy shoes? Upgrade to responsive, lightweight cushioning that protects your stride on every mile. Tap the link in bio to explore our shoe lineup.';
+    } else if (normalizedFormula === 'BAB') {
+      shoePrimary = wantsBulletPoints
+        ? 'Dragging your feet through long days in worn-out, flat sneakers that offer zero support is frustrating. Imagine stepping out in lightweight kicks that feel like walking on clouds, turning heads with clean streetwear aesthetics everywhere you go. Our performance running sneakers bridge that gap effortlessly:\n\n• Cloud-Like Foam Midsoles returning energy with every step\n• Sleek Low-Profile Silhouette pairing perfectly with athletic and casual fits\n• Breathable Mesh Knit keeping your feet fresh through warm weather\n• Long-Lasting Durable Traction designed for hundreds of active miles\n\nExperience pure stride comfort today—tap our bio link to check available sizes!'
+        : 'Dragging your feet through long days in worn-out sneakers that offer zero support is frustrating. Imagine stepping out in kicks that feel like walking on clouds while turning heads with clean athletic style. Our performance running sneakers bridge that gap effortlessly with responsive foam cushioning and breathable modern design. Step into cloud-like comfort—tap the link in our bio to shop!';
+      shoeAlt =
+        'Step past stiff, painful shoes and experience cloud-like sneaker cushioning built for all-day active wear. Tap the bio link to browse the new footwear drop.';
+    } else if (wantsBulletPoints) {
+      shoePrimary =
+        'Upgrade your footwear rotation with premium cushioned running sneakers built for active performance. Here is why runners love them:\n\n• Responsive Energy-Return Midsole for low-impact strides\n• Breathable Engineered Mesh Upper with targeted cooling zones\n• Anatomical Arch Support reducing fatigue on long walks\n• Multi-Surface Rubber Traction for confident grip\n\nWhich colorway is your favorite? Drop a comment below and check the link in bio!';
+      shoeAlt =
+        'Engineered for runners, built for everyday streetwear. Discover lightweight cushioning and athletic durability at the link in bio.';
+    } else {
+      shoePrimary =
+        'Upgrade your footwear rotation with high-performance running sneakers. Featuring responsive cloud foam cushioning and breathable engineered mesh, these kicks deliver unbeatable comfort from your morning miles to city streets.\n\nSave this post for your next shoe upgrade and tell us your favorite colorway below!';
+      shoeAlt =
+        'Engineered for runners, built for everyday streetwear. Discover lightweight cushioning and athletic durability at the link in bio.';
+    }
+
+    const shoeTags = formatTags([
+      '#Sneakers', '#RunningShoes', '#Footwear', '#ShoeStyle',
+      '#DailyKicks', '#SneakerHead', '#KicksOfTheDay', '#ShoeAddict',
+      '#AthleticShoes', '#RunningCommunity', '#ComfortFootwear', '#ShoeLover',
+    ]);
+
+    return {
+      id: 'aezey_sho_' + Date.now().toString(36),
+      timestamp: Date.now(),
+      urlSlug: 'cushioned-athletic-running-shoes',
+      primaryCaption: stripFormulaLabels(stripInstructionEcho(shoePrimary, customInstructions)),
+      alternativeCaption: stripFormulaLabels(stripInstructionEcho(shoeAlt, customInstructions)),
+      hashtags: {
+        industry: ['#Footwear', '#Sneakers', '#AthleticShoes', '#ShoeBrand'],
+        niche: ['#RunningShoes', '#DailyKicks', '#ComfortShoes', '#SneakerHead'],
+        topic: ['#ShoeStyle', '#RunningCommunity', '#AthleticWear', '#ShoeDrop'],
+        audience: ['#SneakerLovers', '#Runners', '#Athletes', '#ShoeCollectors'],
+        productService: ['#RunningSneakers', '#CushionedShoes', '#AthleticFootwear'],
+        location: ['#StreetwearStyle'],
+        all: shoeTags,
+      },
+      seoKeywords: {
+        mainTopic: ['cushioned running shoes', 'athletic sneaker footwear', 'breathable running kicks'],
+        productService: ['responsive running sneakers', 'dual density foam shoes', 'lightweight athletic footwear'],
+        industry: ['athletic footwear retail', 'running shoe technology', 'sneaker brand ecommerce'],
+        audience: ['daily runners', 'sneaker collectors', 'athletes and commuters'],
+        brand: ['Performance Running Sneakers'],
+        searchIntent: ['best cushioned running shoes 2026', 'comfortable athletic sneakers for walking', 'buy breathable running shoes online'],
+        all: [
+          'cushioned running shoes', 'athletic sneaker footwear', 'breathable running kicks',
+          'responsive running sneakers', 'dual density foam shoes', 'lightweight athletic footwear',
+          'athletic footwear retail', 'running shoe technology', 'sneaker brand ecommerce',
+          'daily runners', 'sneaker collectors', 'athletes and commuters',
+          'best cushioned running shoes 2026', 'comfortable athletic sneakers for walking', 'buy breathable running shoes online',
+        ],
+      },
+      callToAction: 'Find your perfect size at the link in our bio or drop your favorite colorway in the comments!',
+      contentSummary: `Athletic footwear product showcase in ${normalizedFormula} format highlighting dual-density foam cushioning, lightweight mesh, and all-day stride comfort.`,
+      detectedContext: {
+        detectedBrand: null,
+        hasBrand: false,
+        visibleText: bufferText.length > 0 ? bufferText : ['Cushioned Athletic Running Shoes', 'Performance Footwear'],
+        detectedLanguage: 'English',
+        tone,
+        mainTopic: 'High-Performance Cushioned Athletic Running Shoes',
+        promotionalIntent: 'Product Launch',
+        targetAudience: 'Runners, sneaker enthusiasts, athletes, and fitness commuters',
+        visualHighlights: [
+          'Detailed athletic sneaker silhouette with prominent cushioning profile',
+          'Textured outsole grip and breathable mesh upper construction',
+          'Dynamic athletic aesthetic tailored for sport and casual wear',
+        ],
+      },
+      platform,
+      tone,
+      formula: normalizedFormula,
+      isSimulatedFallback: true,
+      authNotice: notice,
+    };
+  }
+
+  // --- DOMAIN 3: CLOTHING & APPAREL ---
+  if (isClothing) {
+    let clothPrimary = '';
+    let clothAlt = '';
+
+    if (normalizedFormula === 'AIDA') {
+      clothPrimary = wantsBulletPoints
+        ? 'If you\'ve been searching for that effortless outfit that balances luxury craftsmanship with all-day comfort, this is it. Tailored from ultra-breathable premium fabrics with relaxed modern cuts, our newest apparel collection turns heads while feeling as comfortable as your favorite loungewear. Here are the standout features:\n\n• Premium Breathable Cotton-Linen Blend crafted for warm-weather drape\n• Handcrafted Tailoring ensuring sharp shoulders and comfortable movement\n• Versatile Neutral Palette designed for effortless day-to-night styling\n• Pre-Shrunk Durable Weave that preserves fit and color wash after wash\n\nExperience the confidence of elevated everyday style. Tap the link in our bio to shop the collection before your size sells out!'
+        : 'If you\'ve been searching for that effortless outfit that balances luxury craftsmanship with all-day comfort, this is it. Tailored from ultra-breathable premium fabrics with relaxed modern silhouettes, this apparel collection turns heads while feeling as comfortable as loungewear. Experience elevated statement style that transitions seamlessly from casual afternoons to evening outings. Tap the link in our bio to explore the drop!';
+      clothAlt =
+        'Elevate your everyday wardrobe with handcrafted apparel made from breathable premium textiles. Tap the link in our bio to shop the latest drop.';
+    } else if (normalizedFormula === 'PAS') {
+      clothPrimary = wantsBulletPoints
+        ? 'Staring into a crowded closet and still feeling like you have nothing good to wear is frustrating. Cheap fast fashion shrinks and fades after two washes, while overpriced designer clothes are too stiff for daily life. Our modern clothing collection fixes that wardrobe headache directly:\n\n• Timeless Modern Cuts that never go out of style\n• Ultra-Soft Breathable Textiles engineered for 24/7 ease\n• Reinforced Seams and premium buttons built to last years\n• Easy Mix-and-Match Versatility pairing with all your wardrobe staples\n\nInvest in pieces you\'ll actually love wearing every week—tap the bio link to order today!'
+        : 'Staring into a crowded closet and feeling like you have nothing good to wear is frustrating. Fast fashion shrinks and fades quickly, while stiff designer pieces feel uncomfortable. Our apparel collection delivers handcrafted quality, breathable fabrics, and relaxed fits that elevate your everyday style. Tap the link in our bio to upgrade your wardrobe today!';
+      clothAlt =
+        'Say goodbye to ill-fitting fast fashion and step into durable, handcrafted wardrobe essentials. Explore the full collection at the link in bio.';
+    } else if (normalizedFormula === 'BAB') {
+      clothPrimary = wantsBulletPoints
+        ? 'Settling for faded, uncomfortable basics that leave you feeling uninspired every morning gets old fast. Imagine stepping out in clean, confident silhouettes that feel luxurious, fit perfectly, and get compliments everywhere you go. Our handcrafted apparel drop bridges that gap effortlessly:\n\n• Elevated Modern Silhouettes designed to flatter your natural frame\n• Breathable Luxury Fabrics keeping you cool and comfortable\n• Ethical Craftsmanship backed by sustainable production standards\n• Express Worldwide Shipping straight to your doorstep\n\nUpgrade your everyday style today—check out the collection via the link in our bio!'
+        : 'Settling for faded basics that leave you feeling uninspired every morning gets old fast. Imagine stepping out in clean silhouettes that feel luxurious, fit perfectly, and get compliments everywhere you go. Our apparel drop bridges that gap effortlessly with breathable textiles and timeless cuts. Upgrade your everyday wardrobe—tap the link in our bio to shop!';
+      clothAlt =
+        'Transform your daily fits with elevated streetwear and timeless tailored apparel. Tap the bio link to shop the new drop.';
+    } else if (wantsBulletPoints) {
+      clothPrimary =
+        'Upgrade your style with our latest modern apparel collection. Here are the key highlights:\n\n• Handcrafted Premium Cotton Blend with breathable texture\n• Modern Relaxed Silhouette built for versatile styling\n• Durable Reinforced Stitching that holds shape through washes\n• Ethically Made with sustainable low-impact dyes\n\nTap the link in bio to shop the collection and save this post for fit inspiration!';
+      clothAlt =
+        'Elevate your daily rotation with relaxed luxury streetwear and premium basics. Tap the link in our bio to browse.';
+    } else {
+      clothPrimary =
+        'Upgrade your style with our latest modern apparel collection. Handcrafted from breathable premium textiles with relaxed tailoring, these pieces bring effortless confidence to your daily rotation.\n\nSave this post for your next fit brainstorm and let us know your favorite piece below!';
+      clothAlt =
+        'Elevate your daily rotation with relaxed luxury streetwear and premium basics. Tap the link in our bio to browse.';
+    }
+
+    const clothTags = formatTags([
+      '#Streetwear', '#OOTD', '#FashionStyle', '#SummerFit',
+      '#ClothingBrand', '#WardrobeEssentials', '#UrbanFashion', '#Menswear',
+      '#WomensFashion', '#StyleInspo', '#FashionDrop', '#OutfitIdeas',
+    ]);
+
+    return {
+      id: 'aezey_clo_' + Date.now().toString(36),
+      timestamp: Date.now(),
+      urlSlug: 'urban-streetwear-apparel-collection',
+      primaryCaption: stripFormulaLabels(stripInstructionEcho(clothPrimary, customInstructions)),
+      alternativeCaption: stripFormulaLabels(stripInstructionEcho(clothAlt, customInstructions)),
+      hashtags: {
+        industry: ['#Fashion', '#Apparel', '#ClothingBrand', '#Retail'],
+        niche: ['#Streetwear', '#SummerFit', '#UrbanStyle', '#WardrobeEssentials'],
+        topic: ['#OOTD', '#FashionDrop', '#StyleInspo', '#OutfitIdeas'],
+        audience: ['#FashionLovers', '#StyleEnthusiasts', '#Trendsetters', '#DailyFits'],
+        productService: ['#StreetwearDrop', '#HandcraftedApparel', '#ModernFits'],
+        location: ['#WorldwideShipping'],
+        all: clothTags,
+      },
+      seoKeywords: {
+        mainTopic: ['urban streetwear collection', 'handcrafted cotton apparel', 'summer fashion essentials'],
+        productService: ['designer streetwear garments', 'breathable casual outfits', 'modern tailored clothing'],
+        industry: ['fashion retail ecommerce', 'streetwear apparel brand', 'sustainable fashion boutique'],
+        audience: ['urban fashion shoppers', 'streetwear enthusiasts', 'style conscious trendsetters'],
+        brand: ['Urban Apparel Collection'],
+        searchIntent: ['buy urban streetwear online', 'comfortable cotton clothing summer', 'modern casual apparel shop'],
+        all: [
+          'urban streetwear collection', 'handcrafted cotton apparel', 'summer fashion essentials',
+          'designer streetwear garments', 'breathable casual outfits', 'modern tailored clothing',
+          'fashion retail ecommerce', 'streetwear apparel brand', 'sustainable fashion boutique',
+          'urban fashion shoppers', 'streetwear enthusiasts', 'style conscious trendsetters',
+          'buy urban streetwear online', 'comfortable cotton clothing summer', 'modern casual apparel shop',
+        ],
+      },
+      callToAction: 'Shop the collection at the link in our bio before popular sizes sell out!',
+      contentSummary: `Modern apparel and clothing collection showcase in ${normalizedFormula} format highlighting breathable textiles, relaxed silhouettes, and versatile styling.`,
+      detectedContext: {
+        detectedBrand: null,
+        hasBrand: false,
+        visibleText: bufferText.length > 0 ? bufferText : ['Urban Apparel Collection', 'Handcrafted Clothing'],
+        detectedLanguage: 'English',
+        tone,
+        mainTopic: 'Modern Apparel, Streetwear & Handcrafted Clothing',
+        promotionalIntent: 'Product Launch',
+        targetAudience: 'Fashion-forward shoppers, streetwear enthusiasts, and style trendsetters',
+        visualHighlights: [
+          'High visual fidelity textile detail and modern silhouette drape',
+          'Cohesive color grading with tailored stitching emphasis',
+          'Multi-channel promotional layout optimized for feed discovery',
+        ],
+      },
+      platform,
+      tone,
+      formula: normalizedFormula,
+      isSimulatedFallback: true,
+      authNotice: notice,
+    };
+  }
+
+  // --- DOMAIN 4: COOKING & CULINARY ---
+  if (isCooking) {
+    let cookPrimary = '';
+    let cookAlt = '';
+
+    if (normalizedFormula === 'AIDA') {
+      cookPrimary = wantsBulletPoints
+        ? 'Nothing brings people together quite like the rich aroma of a piping-hot, scratch-made home meal. If you\'re craving comforting, authentic flavors without spending hours tied to the kitchen stove, this recipe is your answer. Here is why this dish will become your new weeknight favorite:\n\n• Fresh Seasonal Ingredients balanced with fragrant herbs and savory spices\n• Simple 30-Minute Prep time with minimal pots and easy cleanup\n• Rich Layered Flavor Profile combining savory umami with bright freshness\n• Foolproof Step-by-Step Technique that guarantees restaurant-quality results\n\nBring authentic culinary magic to your dinner table tonight. Save this recipe post and tap the link in our bio for the full ingredients breakdown!'
+        : 'Nothing brings people together quite like the rich aroma of a piping-hot, scratch-made home meal. If you\'re craving comforting authentic flavors without spending hours over the stove, this recipe is your answer. Fresh seasonal ingredients, balanced herbs, and a savory slow-simmered finish deliver restaurant-quality deliciousness in just 30 minutes. Save this post for tonight\'s dinner and tap the link in our bio for the full recipe!';
+      cookAlt =
+        'Craving comforting, homemade flavors? This easy 30-minute recipe brings rich aroma and authentic taste straight to your table. Save this post and tap the bio link for ingredients.';
+    } else if (normalizedFormula === 'PAS') {
+      cookPrimary = wantsBulletPoints
+        ? 'Coming home exhausted after a long day and staring into an uninspiring fridge only to settle for bland takeout is depressing. Greasy delivery takes forever, costs too much, and never hits the spot. This quick gourmet recipe solves your weeknight dinner dilemma:\n\n• Fast 25-Minute Cook Time from cutting board to dinner plate\n• Pantry-Friendly Staples requiring zero expensive specialty items\n• Hearty Balanced Nutrition packed with clean protein and fresh greens\n• Irresistible Comfort Flavor satisfying every hungry appetite\n\nDitch the expensive takeout and treat yourself to real food tonight—save this post and tap the link in bio for the step-by-step recipe!'
+        : 'Coming home exhausted after a long day only to settle for expensive, bland takeout is depressing. Delivery takes forever and never satisfies like home cooking. This quick gourmet recipe solves your dinner dilemma in 25 minutes with simple pantry staples and restaurant-worthy flavor. Ditch the takeout and treat yourself tonight—save this post and tap the link in bio for the full recipe!';
+      cookAlt =
+        'Tired of expensive, disappointing takeout? Make this delicious 25-minute homemade recipe tonight. Tap the link in bio for the full ingredients list.';
+    } else if (normalizedFormula === 'BAB') {
+      cookPrimary = wantsBulletPoints
+        ? 'Eating the same repetitive, tasteless dinners week after week leaves dinnertime feeling like a boring chore. Imagine sitting down to a steaming, aromatic gourmet plate that tastes like an artisan kitchen cooked it, made effortlessly with your own hands. This signature recipe bridges that gap effortlessly:\n\n• Sautéed Aromatics and Fresh Herbs creating deep savory depth\n• Velvety Balanced Sauce coating every bite to perfection\n• Beginner-Friendly Cooking Steps with guaranteed consistent results\n• Crowd-Pleasing Flavors that family and guests will rave about\n\nTransform your weeknight cooking tonight—save this recipe and check the bio link for exact measurements!'
+        : 'Eating the same repetitive dinners week after week makes dinnertime feel like a chore. Imagine sitting down to a steaming, aromatic gourmet plate that tastes like a five-star kitchen cooked it, made effortlessly in under half an hour. This signature recipe bridges that gap with fresh aromatics and velvety balanced sauces. Transform your cooking tonight—save this post and check our bio link for the recipe!';
+      cookAlt =
+        'Elevate your home cooking from boring routines to gourmet dining. This signature scratch recipe delivers rich flavor in minutes. Tap the bio link for the guide.';
+    } else if (wantsBulletPoints) {
+      cookPrimary =
+        'Bring authentic restaurant flavor to your home kitchen tonight! Here are the core recipe highlights:\n\n• Farm-Fresh Seasonal Ingredients with balanced aromatic seasonings\n• Ready in Just 30 Minutes with straightforward one-pan prep\n• Rich Umami Depth and vibrant fresh herb finish\n• Perfect for cozy family dinners or meal-prep lunches\n\nSave this recipe for your next kitchen session and tap the link in our bio!';
+      cookAlt =
+        'Fresh ingredients, bold aromas, and easy 30-minute execution. Tap the link in our bio for the full step-by-step recipe.';
+    } else {
+      cookPrimary =
+        'Bring authentic restaurant flavor to your home kitchen tonight. With fresh seasonal ingredients, fragrant herbs, and an easy 30-minute workflow, this signature dish delivers mouthwatering comfort in every bite.\n\nSave this post for dinner tonight and tell us your favorite comfort food below!';
+      cookAlt =
+        'Fresh ingredients, bold aromas, and easy 30-minute execution. Tap the link in our bio for the full step-by-step recipe.';
+    }
+
+    const cookTags = formatTags([
+      '#HomeCooking', '#Foodie', '#RecipeShare', '#CulinaryArts',
+      '#EasyRecipes', '#ChefLife', '#DinnerIdeas', '#CookingAtHome',
+      '#FoodLovers', '#QuickDinner', '#HomemadeMeals', '#DeliciousFood',
+    ]);
+
+    return {
+      id: 'aezey_cok_' + Date.now().toString(36),
+      timestamp: Date.now(),
+      urlSlug: 'authentic-gourmet-cooking-recipe',
+      primaryCaption: stripFormulaLabels(stripInstructionEcho(cookPrimary, customInstructions)),
+      alternativeCaption: stripFormulaLabels(stripInstructionEcho(cookAlt, customInstructions)),
+      hashtags: {
+        industry: ['#Food', '#Culinary', '#Cooking', '#Recipes'],
+        niche: ['#EasyRecipes', '#HomeCooking', '#DinnerIdeas', '#HomemadeMeals'],
+        topic: ['#RecipeShare', '#ChefLife', '#QuickDinner', '#DeliciousFood'],
+        audience: ['#Foodies', '#HomeCooks', '#BusyParents', '#FoodLovers'],
+        productService: ['#DinnerRecipe', '#ScratchCooking', '#MealPrepIdeas'],
+        location: ['#HomeKitchen'],
+        all: cookTags,
+      },
+      seoKeywords: {
+        mainTopic: ['authentic homemade recipe', 'gourmet cooking guide', 'easy dinner recipe'],
+        productService: ['30 minute dinner recipe', 'scratch culinary cooking', 'fresh meal prep ideas'],
+        industry: ['culinary recipes online', 'food blog cooking', 'home kitchen dining'],
+        audience: ['home cooks', 'foodies and busy families', 'amateur culinary chefs'],
+        brand: ['Gourmet Kitchen Recipe'],
+        searchIntent: ['quick 30 minute dinner recipe', 'how to cook gourmet meals at home', 'easy homemade recipe with fresh ingredients'],
+        all: [
+          'authentic homemade recipe', 'gourmet cooking guide', 'easy dinner recipe',
+          '30 minute dinner recipe', 'scratch culinary cooking', 'fresh meal prep ideas',
+          'culinary recipes online', 'food blog cooking', 'home kitchen dining',
+          'home cooks', 'foodies and busy families', 'amateur culinary chefs',
+          'quick 30 minute dinner recipe', 'how to cook gourmet meals at home', 'easy homemade recipe with fresh ingredients',
+        ],
+      },
+      callToAction: 'Save this recipe for tonight\'s dinner and click the link in our bio for the full ingredients breakdown!',
+      contentSummary: `Culinary recipe and gourmet home cooking guide in ${normalizedFormula} format highlighting fresh ingredients, 30-minute prep, and comforting aromas.`,
+      detectedContext: {
+        detectedBrand: null,
+        hasBrand: false,
+        visibleText: bufferText.length > 0 ? bufferText : ['Gourmet Home Cooking Recipe', 'Authentic Culinary Dish'],
+        detectedLanguage: 'English',
+        tone,
+        mainTopic: 'Authentic Gourmet Cooking & Homemade Culinary Recipes',
+        promotionalIntent: 'Educational Recipe',
+        targetAudience: 'Foodies, home cooks, busy professionals, and culinary enthusiasts',
+        visualHighlights: [
+          'Appetizing culinary composition with vibrant ingredients and garnish',
+          'Clear presentation of finished dish with appealing textures',
+          'Engaging recipe format optimized for social cooking discovery',
+        ],
+      },
+      platform,
+      tone,
+      formula: normalizedFormula,
+      isSimulatedFallback: true,
+      authNotice: notice,
+    };
+  }
+
+  // --- DOMAIN 5: SOCIAL MEDIA MARKETING ---
+  if (isSocialMediaMarketing) {
+    let smmPrimary = '';
+    let smmAlt = '';
+
+    if (normalizedFormula === 'AIDA') {
+      smmPrimary = wantsBulletPoints
+        ? 'If you\'re posting daily content only to watch views flatline and direct inquiries stall, it\'s time for a smarter strategy. Our organic social media marketing frameworks help founders and service providers turn passive scrollers into booked clients without chasing vanity trends. Here is how we build your high-converting organic presence:\n\n• High-Retention Short-Form Video Hooks engineered to stop the feed scroll\n• Friction-Free Profile Funnels converting bio clicks into qualified leads\n• Social Search SEO Optimization ranking your posts for high-intent search terms\n• Storytelling Copy Frameworks that build immediate authority and buyer trust\n\nImagine having a predictable stream of inbound client inquiries arriving directly in your inbox every single week. Stop guessing what the algorithm wants—tap the link in our bio or send us a DM to claim your free social media growth audit!'
+        : 'If you\'re posting daily content only to watch views flatline and inquiries stall, it\'s time for a smarter strategy. Our organic social media marketing frameworks help founders and service providers turn passive scrollers into booked clients without chasing vanity trends. By pairing high-retention video hooks with social search SEO and profile conversion funnels, we turn your feed into a consistent client acquisition engine. Stop guessing what the algorithm wants—tap the link in our bio or DM us today to claim your free growth audit!';
+      smmAlt =
+        'Stop posting into the void. Turn passive social scrollers into qualified clients with high-retention hooks and conversion funnels. DM us or tap the bio link for a free audit.';
+    } else if (normalizedFormula === 'PAS') {
+      smmPrimary = wantsBulletPoints
+        ? 'Spending hours scripting, shooting, and editing reels only to get double-digit views and zero sales inquiries is demoralizing. While you burn energy on random dancing trends, your competitors are capturing your ideal clients with focused content systems. Our proven social media marketing framework fixes your reach pipeline:\n\n• Algorithm-Tested Opening Hooks capturing viewer attention within 3 seconds\n• Direct-Response Captions guiding warm prospects straight to your offers\n• Semantic Hashtag Architecture matching social search intent\n• Monthly Content Sprints delivering 30 days of strategic posts in hours\n\nReady to turn your social media into consistent business revenue? Tap our bio link or send a DM to start scaling!'
+        : 'Spending hours creating reels only to get low views and zero client inquiries is demoralizing. While you burn energy on random trends, competitors capture your dream clients with focused content systems. Our social media marketing framework fixes your pipeline with algorithm-tested hooks, profile funnels, and semantic social SEO. Ready to scale? Tap the link in our bio or DM us today to fix your social presence!';
+      smmAlt =
+        'Struggling to convert social media followers into paying clients? Stop burning hours on low-performing posts. Tap the bio link to audit your content funnel today.';
+    } else if (normalizedFormula === 'BAB') {
+      smmPrimary = wantsBulletPoints
+        ? 'Feeling invisible on social media and wondering why your hard work never translates into real client bookings is exhausting. Imagine waking up to an active comment section of ideal buyers and inbound direct messages asking for your services every morning. Our strategic social media growth framework bridges that gap effortlessly:\n\n• High-Intent Search Optimization ranking your profile at the top of social search\n• Evergreen Authority Carousels that establish your brand as the go-to expert\n• High-Converting Video Scripts designed for maximum watch time\n• Automated Direct-Message Lead Funnels qualifying prospects on autopilot\n\nStep into predictable organic growth today—tap the link in our bio or message us to claim your custom strategy map!'
+        : 'Feeling invisible on social media and wondering why your hard work never translates into client bookings is exhausting. Imagine waking up to qualified inbound messages and buyers asking for your services every day. Our social media growth framework bridges that gap effortlessly with search-optimized reels, authority carousels, and conversion funnels. Claim your predictable organic growth—tap the link in our bio or DM us today!';
+      smmAlt =
+        'Bridge the gap between stagnant follower counts and consistent client bookings. Our social media marketing systems drive real revenue. Tap the bio link to get started.';
+    } else if (wantsBulletPoints) {
+      smmPrimary =
+        'Transform your social media channels into a predictable client acquisition engine. Here are the core growth pillars:\n\n• 3-Second Scroll-Stopping Hooks tested across short-form video\n• Social Search Optimization targeting high-intent buyer keywords\n• Profile Funnel Optimization converting views into direct inquiries\n• Authority-Building Copywriting that establishes market leadership\n\nDrop a comment or DM "SCALE" to claim your free content strategy audit!';
+      smmAlt =
+        'Actionable social media growth tips: focus on search-first short-form video, profile conversion funnels, and authentic authority copy. Tap the bio link for details.';
+    } else {
+      smmPrimary =
+        'Stop guessing your social media growth. High-retention hooks, semantic social SEO, and friction-free profile funnels are the true difference between vanity views and consistent revenue.\n\nSave this post for your next content brainstorm or DM us to audit your marketing strategy!';
+      smmAlt =
+        'Actionable social media growth tips: focus on search-first short-form video, profile conversion funnels, and authentic authority copy. Tap the bio link for details.';
+    }
+
+    const smmTags = formatTags([
+      '#SocialMediaMarketing', '#SMMTips', '#ContentStrategy', '#GrowthMarketing',
+      '#SocialMediaManager', '#MarketingAgency', '#OrganicGrowth', '#LeadGeneration',
+      '#ReelsStrategy', '#SocialMediaTips', '#BusinessGrowth', '#MarketingStrategy',
+    ]);
+
+    return {
+      id: 'aezey_smm_' + Date.now().toString(36),
+      timestamp: Date.now(),
+      urlSlug: 'social-media-marketing-growth-strategy',
+      primaryCaption: stripFormulaLabels(stripInstructionEcho(smmPrimary, customInstructions)),
+      alternativeCaption: stripFormulaLabels(stripInstructionEcho(smmAlt, customInstructions)),
+      hashtags: {
+        industry: ['#Marketing', '#SocialMedia', '#DigitalAgency', '#GrowthHacking'],
+        niche: ['#SocialMediaMarketing', '#SMMTips', '#ReelsStrategy', '#OrganicReach'],
+        topic: ['#ContentStrategy', '#SocialMediaTips', '#LeadGeneration', '#MarketingHacks'],
+        audience: ['#BusinessOwners', '#Creators', '#Entrepreneurs', '#Founders'],
+        productService: ['#SMMService', '#ContentAgency', '#SocialMediaAudit'],
+        location: ['#OnlineBusiness'],
+        all: smmTags,
+      },
+      seoKeywords: {
+        mainTopic: ['social media marketing strategy', 'organic content growth', 'social media agency services'],
+        productService: ['short form video growth funnels', 'social search SEO audit', 'reels client acquisition agency'],
+        industry: ['social media management agency', 'digital marketing consulting', 'organic brand scaling'],
+        audience: ['business owners and founders', 'social media managers', 'creative entrepreneurs'],
+        brand: ['Social Media Growth Agency'],
+        searchIntent: ['how to get clients from social media', 'best social media marketing agency 2026', 'social media SEO tips'],
+        all: [
+          'social media marketing strategy', 'organic content growth', 'social media agency services',
+          'short form video growth funnels', 'social search SEO audit', 'reels client acquisition agency',
+          'social media management agency', 'digital marketing consulting', 'organic brand scaling',
+          'business owners and founders', 'social media managers', 'creative entrepreneurs',
+          'how to get clients from social media', 'best social media marketing agency 2026', 'social media SEO tips',
+        ],
+      },
+      callToAction: 'DM us "SCALE" or tap the link in our bio to claim your complimentary social media growth audit!',
+      contentSummary: `Social media marketing and conversion funnel strategy structured in ${normalizedFormula} format highlighting short-form hooks and organic lead acquisition.`,
+      detectedContext: {
+        detectedBrand: null,
+        hasBrand: false,
+        visibleText: bufferText.length > 0 ? bufferText : ['Social Media Marketing Agency', 'Organic Growth Funnels'],
+        detectedLanguage: 'English',
+        tone,
+        mainTopic: 'Social Media Marketing & Organic Client Acquisition Strategy',
+        promotionalIntent: 'Service Offering',
+        targetAudience: 'Business owners, founders, creators, and marketing managers',
+        visualHighlights: [
+          'Strategic social media performance metrics and growth pillars',
+          'High-contrast visual hook emphasizing lead generation and engagement',
+          'Direct conversion call-to-action formatted for multi-platform distribution',
+        ],
+      },
+      platform,
+      tone,
+      formula: normalizedFormula,
+      isSimulatedFallback: true,
+      authNotice: notice,
+    };
+  }
+
+  // --- DOMAIN 6: COFFEE SHOP & CAFE ---
+  if (isCoffee) {
+    let coffeePrimary = '';
+    let coffeeAlt = '';
+
+    if (normalizedFormula === 'AIDA') {
+      coffeePrimary = wantsBulletPoints
+        ? 'Your morning routine deserves more than bitter, burnt coffee on the go. Step into our cozy artisan cafe where ethically sourced single-origin beans meet silky hand-poured microfoam latte art. Here is why locals make us their daily coffee ritual:\n\n• In-House Small-Batch Roasts preserving rich chocolate and berry notes\n• Skilled Baristas pulling balanced double espresso shots on demand\n• Daily Scratch-Baked Pastries made with pure butter and seasonal fillings\n• Welcoming Warm Aesthetic perfect for morning focus or relaxed meetups\n\nStart your morning on the right note. Visit us today or tap the link in our bio to order ahead for instant pickup!'
+        : 'Your morning routine deserves more than bitter coffee on the run. Step into our cozy artisan cafe where ethically sourced single-origin beans meet silky hand-poured latte art. From balanced double espressos to warm scratch-baked pastries, we bring artisan comfort to your daily grind. Visit us today or tap the link in our bio to order ahead for quick pickup!';
+      coffeeAlt =
+        'Experience artisan roasted coffee and fresh daily pastries in a warm community cafe. Stop by today or tap the bio link to order ahead.';
+    } else if (wantsBulletPoints) {
+      coffeePrimary =
+        'Experience specialty coffee at its finest. Here is what awaits you at our cafe:\n\n• Single-Origin Arabica Beans ethically sourced and roasted in-house\n• Silky Hand-Crafted Latte Art with plant-based milk options\n• Warm Community Space with fast Wi-Fi and cozy seating\n• Scratch-Baked Croissants and seasonal sweet treats daily\n\nVisit us today or tap the link in our bio to check our daily roast specials!';
+      coffeeAlt =
+        'Artisan roasted espresso and fresh pastries in a cozy neighborhood cafe. Tap the link in bio for directions and hours.';
+    } else {
+      coffeePrimary =
+        'Your daily coffee ritual, elevated. Experience small-batch roasted single-origin espresso, silky latte art, and fresh scratch-baked pastries in a warm neighborhood setting.\n\nStop by today or tap the link in our bio to browse our seasonal drinks menu!';
+      coffeeAlt =
+        'Artisan roasted espresso and fresh pastries in a cozy neighborhood cafe. Tap the link in bio for directions and hours.';
+    }
+
+    const coffeeTags = formatTags([
+      '#CoffeeShop', '#Espresso', '#SpecialtyCoffee', '#CafeVibes',
+      '#LatteArt', '#CoffeeRoaster', '#CoffeeLovers', '#DailyCoffee',
+      '#CafeCulture', '#BaristaLife', '#MorningCoffee', '#LocalCafe',
+    ]);
+
+    return {
+      id: 'aezey_cff_' + Date.now().toString(36),
+      timestamp: Date.now(),
+      urlSlug: 'artisan-espresso-coffee-shop',
+      primaryCaption: stripFormulaLabels(stripInstructionEcho(coffeePrimary, customInstructions)),
+      alternativeCaption: stripFormulaLabels(stripInstructionEcho(coffeeAlt, customInstructions)),
+      hashtags: {
+        industry: ['#Coffee', '#Cafe', '#Hospitality', '#FoodAndBeverage'],
+        niche: ['#SpecialtyCoffee', '#Espresso', '#LatteArt', '#CoffeeRoaster'],
+        topic: ['#CafeVibes', '#CoffeeLovers', '#MorningCoffee', '#LocalCafe'],
+        audience: ['#CoffeeAddicts', '#RemoteWorkers', '#Foodies', '#Community'],
+        productService: ['#SingleOriginCoffee', '#ArtisanRoast', '#FreshPastries'],
+        location: ['#DowntownCafe'],
+        all: coffeeTags,
+      },
+      seoKeywords: {
+        mainTopic: ['specialty coffee roast', 'artisan espresso cafe', 'local coffee house brews'],
+        productService: ['single origin arabica espresso', 'handcrafted latte art', 'scratch baked cafe pastries'],
+        industry: ['specialty coffee roastery', 'independent cafe retail', 'artisan coffeehouse'],
+        audience: ['specialty coffee drinkers', 'remote workers and students', 'neighborhood cafe patrons'],
+        brand: ['Artisan Coffee Roasters'],
+        searchIntent: ['best specialty coffee shop near me', 'artisan espresso cafe downtown', 'buy freshly roasted coffee beans online'],
+        all: [
+          'specialty coffee roast', 'artisan espresso cafe', 'local coffee house brews',
+          'single origin arabica espresso', 'handcrafted latte art', 'scratch baked cafe pastries',
+          'specialty coffee roastery', 'independent cafe retail', 'artisan coffeehouse',
+          'specialty coffee drinkers', 'remote workers and students', 'neighborhood cafe patrons',
+          'best specialty coffee shop near me', 'artisan espresso cafe downtown', 'buy freshly roasted coffee beans online',
+        ],
+      },
+      callToAction: 'Stop by our cafe today or tap the link in our bio to order ahead for fast pickup!',
+      contentSummary: `Specialty coffee and cafe presentation structured in ${normalizedFormula} format highlighting single-origin roasts, latte art, and scratch pastries.`,
+      detectedContext: {
+        detectedBrand: null,
+        hasBrand: false,
+        visibleText: bufferText.length > 0 ? bufferText : ['Artisan Coffee Roasters', 'Specialty Espresso & Pastries'],
+        detectedLanguage: 'English',
+        tone,
+        mainTopic: 'Specialty Espresso, Single-Origin Roasts & Artisan Cafe',
+        promotionalIntent: 'Local Business',
+        targetAudience: 'Coffee lovers, remote workers, neighborhood commuters, and foodies',
+        visualHighlights: [
+          'Artisan coffee setting with rich crema and microfoam latte art detail',
+          'Warm ambient cafe aesthetic highlighting freshly roasted beans',
+          'Inviting local business presentation optimized for search discovery',
+        ],
+      },
+      platform,
+      tone,
+      formula: normalizedFormula,
+      isSimulatedFallback: true,
+      authNotice: notice,
+    };
+  }
+
+  // --- DOMAIN 7: FITNESS & GYM ---
+  if (isFitness) {
+    let fitPrimary = '';
+    let fitAlt = '';
+
+    if (normalizedFormula === 'AIDA') {
+      fitPrimary = wantsBulletPoints
+        ? 'Tired of generic workout routines that leave you sore without building real strength or definition? Take your training to the next level with our customized strength and conditioning programs. Guided by certified coaches in a high-energy facility, here is how we help you reach your peak fitness:\n\n• Tailored Strength & Hypertrophy Programs aligned with your exact body goals\n• Expert 1-on-1 Form Coaching preventing injuries and boosting performance\n• State-of-the-Art Free Weights, Turf Track, and Recovery Zone\n• Supportive Community Culture keeping you motivated and accountable every session\n\nStop spinning your wheels in the gym. Claim your complimentary strategy session today via the link in our bio or drop a comment below!'
+        : 'Tired of generic workout routines that leave you sore without building real strength? Take your training to the next level with our customized strength and conditioning coaching. Guided by certified trainers in a motivating facility, we build personalized roadmaps that deliver lasting physical transformation. Stop guessing—tap the link in our bio to claim your free trial pass today!';
+      fitAlt =
+        'Transform your fitness with personalized strength coaching and high-energy workouts. Claim your complimentary session at the link in our bio.';
+    } else if (wantsBulletPoints) {
+      fitPrimary =
+        'Reach your fitness goals with structured strength and conditioning coaching. Here are our training highlights:\n\n• Personalized Workout Programs tailored to strength and fat loss\n• Certified Personal Trainers guiding form and progression\n• Full Range of Premium Free Weights, Racks, and Conditioning Turf\n• Inspiring Gym Community that keeps you consistent and hungry\n\nTap the link in bio to book your free consultation and tour our gym!';
+      fitAlt =
+        'Custom personal training and strength programs built for sustainable results. Tap the link in bio to book a trial session.';
+    } else {
+      fitPrimary =
+        'Reach your fitness goals with structured strength and conditioning coaching. Certified trainers, state-of-the-art equipment, and an encouraging community ensure you get stronger, faster, and healthier every week.\n\nTap the link in our bio to claim your free trial pass today!';
+      fitAlt =
+        'Custom personal training and strength programs built for sustainable results. Tap the link in bio to book a trial session.';
+    }
+
+    const fitTags = formatTags([
+      '#Fitness', '#GymLife', '#WorkoutMotivation', '#PersonalTrainer',
+      '#StrengthTraining', '#FitLife', '#HealthGoals', '#GymMotivation',
+      '#Bodybuilding', '#WeightLifting', '#FitnessCoach', '#FitnessJourney',
+    ]);
+
+    return {
+      id: 'aezey_fit_' + Date.now().toString(36),
+      timestamp: Date.now(),
+      urlSlug: 'personal-fitness-training-program',
+      primaryCaption: stripFormulaLabels(stripInstructionEcho(fitPrimary, customInstructions)),
+      alternativeCaption: stripFormulaLabels(stripInstructionEcho(fitAlt, customInstructions)),
+      hashtags: {
+        industry: ['#Fitness', '#Health', '#Wellness', '#Gym'],
+        niche: ['#StrengthTraining', '#PersonalTrainer', '#WorkoutMotivation', '#FitnessCoach'],
+        topic: ['#FitnessGoals', '#GymLife', '#FitLife', '#BodyTransformation'],
+        audience: ['#Athletes', '#GymMembers', '#FitnessLovers', '#Beginners'],
+        productService: ['#PersonalTraining', '#GymMembership', '#StrengthCoach'],
+        location: ['#FitnessStudio'],
+        all: fitTags,
+      },
+      seoKeywords: {
+        mainTopic: ['personal fitness training', 'strength conditioning program', 'gym workout routine'],
+        productService: ['1 on 1 personal coaching', 'custom gym workout plan', 'group fitness training sessions'],
+        industry: ['fitness gym center', 'health and fitness club', 'strength training facility'],
+        audience: ['fitness enthusiasts', 'gym members', 'individuals seeking fat loss and strength'],
+        brand: ['Elite Fitness Training'],
+        searchIntent: ['best personal trainer gym near me', 'strength training workout programs for beginners', 'join private fitness club free trial'],
+        all: [
+          'personal fitness training', 'strength conditioning program', 'gym workout routine',
+          '1 on 1 personal coaching', 'custom gym workout plan', 'group fitness training sessions',
+          'fitness gym center', 'health and fitness club', 'strength training facility',
+          'fitness enthusiasts', 'gym members', 'individuals seeking fat loss and strength',
+          'best personal trainer gym near me', 'strength training workout programs for beginners', 'join private fitness club free trial'],
+      },
+      callToAction: 'Claim your complimentary training pass and consultation at the link in our bio today!',
+      contentSummary: `Fitness coaching and strength training facility showcase in ${normalizedFormula} format highlighting personalized programming, certified trainers, and community support.`,
+      detectedContext: {
+        detectedBrand: null,
+        hasBrand: false,
+        visibleText: bufferText.length > 0 ? bufferText : ['Elite Fitness Training', 'Strength & Conditioning'],
+        detectedLanguage: 'English',
+        tone,
+        mainTopic: 'Functional Strength, Personal Training & Gym Conditioning',
+        promotionalIntent: 'Membership Promotion',
+        targetAudience: 'Fitness enthusiasts, athletes, gym members, and health-focused individuals',
+        visualHighlights: [
+          'High-intensity fitness facility layout with clean strength equipment',
+          'Dynamic athletic training visual emphasizing functional performance',
+          'High-converting call-to-action targeted at fitness consultation bookings',
+        ],
+      },
+      platform,
+      tone,
+      formula: normalizedFormula,
+      isSimulatedFallback: true,
+      authNotice: notice,
+    };
+  }
+
+  // --- DOMAIN 8: DENTAL & HEALTHCARE ---
+  if (isDental) {
+    let dentalPrimary = '';
+    let dentalAlt = '';
+
+    if (normalizedFormula === 'AIDA') {
+      dentalPrimary = wantsBulletPoints
+        ? 'A bright, healthy smile changes how you carry yourself in every room. If you\'ve been putting off dental care due to busy schedules or anxiety, our gentle family dentistry practice is here to make your visit calm and effortless. Here is what makes our patient care special:\n\n• Gentle Preventive Cleanings and comprehensive digital oral health screenings\n• Advanced In-Office Teeth Whitening delivering noticeably brighter results in one visit\n• Clear Aligners and aesthetic cosmetic restorations tailored to your smile\n• Compassionate Team with sedation options ensuring a stress-free experience\n\nRediscover the confidence of a healthy, radiant smile. Book your new patient consultation today via the link in our bio or call our clinic directly!'
+        : 'A bright, healthy smile changes how you carry yourself in every room. If you\'ve been putting off dental visits due to anxiety or time, our gentle dental clinic is here to deliver exceptional care in a comfortable environment. From gentle cleanings to in-office whitening and clear aligners, we keep your smile radiant. Book your consultation today via the link in our bio!';
+      dentalAlt =
+        'Experience gentle family dental care and professional teeth whitening in a calm, modern clinic. Book your visit at the link in our bio.';
+    } else if (wantsBulletPoints) {
+      dentalPrimary =
+        'Care for your smile with modern family dentistry. Here is what we offer our patients:\n\n• Thorough Preventive Cleanings and Digital X-Ray Screenings\n• In-Office Professional Teeth Whitening for instant radiance\n• Minimally Invasive Cosmetic Restorations and Dental Veneers\n• Patient-First Comfort Team ensuring a relaxed dental visit\n\nCall our clinic or tap the link in bio to schedule your family dental appointment!';
+      dentalAlt =
+        'Gentle, modern dentistry for the whole family. Book your consultation today at the link in bio.';
+    } else {
+      dentalPrimary =
+        'Care for your smile with modern family dentistry. Gentle cleanings, professional whitening, and compassionate patient care in a comfortable, state-of-the-art dental clinic.\n\nTap the link in our bio or call our clinic to schedule your appointment today!';
+      dentalAlt =
+        'Gentle, modern dentistry for the whole family. Book your consultation today at the link in bio.';
+    }
+
+    const dentalTags = formatTags([
+      '#DentalCare', '#HealthySmile', '#Dentist', '#TeethWhitening',
+      '#OralHealth', '#SmileCare', '#FamilyDentistry', '#CosmeticDentist',
+      '#DentalHealth', '#DentistryWorld', '#SmileMakeover', '#DentalClinic',
+    ]);
+
+    return {
+      id: 'aezey_dnt_' + Date.now().toString(36),
+      timestamp: Date.now(),
+      urlSlug: 'family-dental-care-clinic',
+      primaryCaption: stripFormulaLabels(stripInstructionEcho(dentalPrimary, customInstructions)),
+      alternativeCaption: stripFormulaLabels(stripInstructionEcho(dentalAlt, customInstructions)),
+      hashtags: {
+        industry: ['#Healthcare', '#Dentistry', '#DentalClinic', '#Wellness'],
+        niche: ['#DentalCare', '#TeethWhitening', '#FamilyDentistry', '#CosmeticDentistry'],
+        topic: ['#HealthySmile', '#SmileMakeover', '#OralHealth', '#DentalTips'],
+        audience: ['#Patients', '#Families', '#SmileLovers', '#HealthCareSeekers'],
+        productService: ['#TeethWhiteningService', '#DentalCleanings', '#ClearAligners'],
+        location: ['#DentalPractice'],
+        all: dentalTags,
+      },
+      seoKeywords: {
+        mainTopic: ['family dental clinic', 'cosmetic teeth whitening', 'healthy smile dentistry'],
+        productService: ['gentle dental cleaning service', 'in office teeth whitening treatment', 'clear aligners consultation'],
+        industry: ['dental healthcare practice', 'cosmetic dentistry clinic', 'general family dentistry'],
+        audience: ['dental patients', 'families needing regular dental checkups', 'individuals seeking teeth whitening'],
+        brand: ['Family Dental Care Clinic'],
+        searchIntent: ['best gentle family dentist near me', 'cosmetic teeth whitening cost clinic', 'schedule dental exam and cleaning appointment'],
+        all: [
+          'family dental clinic', 'cosmetic teeth whitening', 'healthy smile dentistry',
+          'gentle dental cleaning service', 'in office teeth whitening treatment', 'clear aligners consultation',
+          'dental healthcare practice', 'cosmetic dentistry clinic', 'general family dentistry',
+          'dental patients', 'families needing regular dental checkups', 'individuals seeking teeth whitening',
+          'best gentle family dentist near me', 'cosmetic teeth whitening cost clinic', 'schedule dental exam and cleaning appointment',
+        ],
+      },
+      callToAction: 'Book your new patient dental consultation and cleaning at the link in our bio today!',
+      contentSummary: `Dental clinic patient care and smile aesthetics presentation in ${normalizedFormula} format highlighting gentle cleanings, teeth whitening, and preventive care.`,
+      detectedContext: {
+        detectedBrand: null,
+        hasBrand: false,
+        visibleText: bufferText.length > 0 ? bufferText : ['Family Dental Clinic', 'Gentle Dental Care & Whitening'],
+        detectedLanguage: 'English',
+        tone,
+        mainTopic: 'Comprehensive Family Dental Care, Teeth Whitening & Smile Aesthetics',
+        promotionalIntent: 'Appointment Booking',
+        targetAudience: 'Families, dental patients, professionals seeking smile whitening',
+        visualHighlights: [
+          'Clean modern dental clinic setting with patient care emphasis',
+          'Professional oral health highlights and cosmetic whitening options',
+          'Trust-building healthcare copy optimized for local clinic appointment booking',
+        ],
+      },
+      platform,
+      tone,
+      formula: normalizedFormula,
+      isSimulatedFallback: true,
+      authNotice: notice,
+    };
+  }
+
+  // --- DOMAIN 9: AUTOMOTIVE & CAR REPAIR ---
+  if (isAuto) {
+    let autoPrimary = '';
+    let autoAlt = '';
+
+    if (normalizedFormula === 'AIDA') {
+      autoPrimary = wantsBulletPoints
+        ? 'Your vehicle keeps your life moving—don\'t let sudden breakdowns or neglected maintenance put your safety at risk. At our certified automotive repair facility, our master technicians deliver precision diagnostics and transparent service you can rely on. Here is what our full-service care includes:\n\n• Comprehensive Multi-Point Vehicle Safety & Computer Diagnostic Scans\n• Certified Brake System Servicing with premium ceramic pads and rotors\n• Fast Precision Full-Synthetic Oil and Fluid Replacement\n• Warranty-Backed Workmanship on all mechanical repairs and part replacements\n\nDrive with complete peace of mind. Schedule your vehicle service today via our bio link or call the shop directly!'
+        : 'Your vehicle keeps your life moving—don\'t let sudden breakdowns or neglected maintenance put your safety at risk. At our certified auto repair shop, our technicians deliver precision diagnostics, brake servicing, and routine maintenance with transparent pricing and warranty-backed workmanship. Drive with confidence—schedule your service appointment at the link in our bio today!';
+      autoAlt =
+        'Certified automotive repair and preventative maintenance with honest pricing and warranty-backed repairs. Tap the bio link to book your service.';
+    } else if (wantsBulletPoints) {
+      autoPrimary =
+        'Keep your car performing at its peak with certified automotive service. Here are our core repair specialties:\n\n• Precision Computer Diagnostics and Warning Light Inspection\n• Complete Brake Repair and Rotor Replacement\n• Full-Synthetic Oil Changes and Fluid Flushes\n• Suspension, Steering, and Transmission Servicing\n\nCall our repair shop today or tap the link in bio to book your appointment!';
+      autoAlt =
+        'Reliable car repair and maintenance with certified technicians. Schedule your service appointment via the link in bio.';
+    } else {
+      autoPrimary =
+        'Keep your vehicle running safely and smoothly with certified automotive maintenance. Transparent pricing, computer diagnostics, and warranty-backed repairs by certified mechanics.\n\nCall our repair shop or tap the link in our bio to book your service appointment today!';
+      autoAlt =
+        'Reliable car repair and maintenance with certified technicians. Schedule your service appointment via the link in bio.';
+    }
+
+    const autoTags = formatTags([
+      '#AutoRepair', '#CarCare', '#Mechanic', '#VehicleMaintenance',
+      '#AutoService', '#CarMaintenance', '#AutoShop', '#BrakeRepair',
+      '#CarLovers', '#AutoMechanic', '#VehicleCare', '#OilChange',
+    ]);
+
+    return {
+      id: 'aezey_aut_' + Date.now().toString(36),
+      timestamp: Date.now(),
+      urlSlug: 'certified-auto-repair-service',
+      primaryCaption: stripFormulaLabels(stripInstructionEcho(autoPrimary, customInstructions)),
+      alternativeCaption: stripFormulaLabels(stripInstructionEcho(autoAlt, customInstructions)),
+      hashtags: {
+        industry: ['#Automotive', '#AutoRepair', '#MechanicShop', '#CarCare'],
+        niche: ['#VehicleMaintenance', '#BrakeService', '#OilChangeService', '#AutoService'],
+        topic: ['#CarMaintenance', '#AutoShop', '#CarSafety', '#VehicleCare'],
+        audience: ['#CarOwners', '#Drivers', '#Commuters', '#VehicleEnthusiasts'],
+        productService: ['#BrakeRepair', '#DiagnosticScan', '#CertifiedAutoCare'],
+        location: ['#AutoRepairShop'],
+        all: autoTags,
+      },
+      seoKeywords: {
+        mainTopic: ['certified auto repair service', 'complete vehicle maintenance', 'car brake inspection'],
+        productService: ['computer diagnostic auto scan', 'synthetic oil change service', 'brake pad and rotor repair'],
+        industry: ['automotive repair facility', 'car mechanic shop', 'vehicle inspection center'],
+        audience: ['car owners', 'daily drivers and commuters', 'fleet vehicle managers'],
+        brand: ['Certified Auto Repair Services'],
+        searchIntent: ['best certified auto repair shop near me', 'car brake repair service cost', 'schedule auto diagnostic appointment'],
+        all: [
+          'certified auto repair service', 'complete vehicle maintenance', 'car brake inspection',
+          'computer diagnostic auto scan', 'synthetic oil change service', 'brake pad and rotor repair',
+          'automotive repair facility', 'car mechanic shop', 'vehicle inspection center',
+          'car owners', 'daily drivers and commuters', 'fleet vehicle managers',
+          'best certified auto repair shop near me', 'car brake repair service cost', 'schedule auto diagnostic appointment',
+        ],
+      },
+      callToAction: 'Schedule your comprehensive vehicle inspection and service appointment at the link in our bio today!',
+      contentSummary: `Automotive repair and vehicle maintenance presentation in ${normalizedFormula} format highlighting computer diagnostics, brake servicing, and certified workmanship.`,
+      detectedContext: {
+        detectedBrand: null,
+        hasBrand: false,
+        visibleText: bufferText.length > 0 ? bufferText : ['Certified Auto Repair', 'Precision Diagnostics & Maintenance'],
+        detectedLanguage: 'English',
+        tone,
+        mainTopic: 'Certified Automotive Repair, Precision Diagnostics & Vehicle Maintenance',
+        promotionalIntent: 'Service Appointment',
+        targetAudience: 'Car owners, drivers, commuters, and fleet managers',
+        visualHighlights: [
+          'Professional automotive repair facility with modern diagnostic bay',
+          'Clear presentation of mechanical service specialties and maintenance check',
+          'High-trust local business call-to-action for service booking',
+        ],
+      },
+      platform,
+      tone,
+      formula: normalizedFormula,
+      isSimulatedFallback: true,
+      authNotice: notice,
+    };
+  }
+
+  // --- DOMAIN 10: REAL ESTATE & PROPERTY ---
+  if (isRealEstate) {
+    let rePrimary = '';
+    let reAlt = '';
+
+    if (normalizedFormula === 'AIDA') {
+      rePrimary = wantsBulletPoints
+        ? 'Finding a home that perfectly balances architectural elegance, modern amenities, and prime location is rare. We are thrilled to unveil this exceptional residential property that redefines modern living. Here are the highlights of this signature listing:\n\n• Sun-Drenched Open-Concept Living with floor-to-ceiling windows and soaring ceilings\n• Gourmet Chef\'s Kitchen equipped with premium quartz counters and built-in appliances\n• Private Primary Suite featuring a spa-like soaking tub and custom walk-in wardrobe\n• Prime Neighborhood Location walking distance to top-rated schools, parks, and dining\n\nYour dream home is waiting. Schedule your private walkthrough tour today via the link in our bio or send us a direct inquiry!'
+        : 'Finding a home that perfectly balances architectural elegance, modern amenities, and prime location is rare. We are thrilled to unveil this exceptional residential listing that redefines modern living. Featuring sun-drenched open living spaces, a chef\'s kitchen, and a private spa-inspired primary suite, this property offers unmatched lifestyle comfort. Schedule your private walkthrough tour today at the link in our bio!';
+      reAlt =
+        'Experience modern luxury living with this sun-drenched architectural property listing. Tap the link in our bio to schedule a private tour.';
+    } else if (wantsBulletPoints) {
+      rePrimary =
+        'Explore this stunning modern property listing. Here are the home\'s standout features:\n\n• Expansive Open-Concept Floorplan with designer architectural finishes\n• Chef\'s Kitchen with quartz waterfall island and custom cabinetry\n• Luxurious Primary Bedroom Suite with private balcony and spa bathroom\n• Prime Location close to top schools, shopping, and commuter transit\n\nTap the link in bio or send a DM to book your private showing today!';
+      reAlt =
+        'Luxury modern residential property listing now on the market. Tap the link in bio for photos and private showing details.';
+    } else {
+      rePrimary =
+        'Explore this stunning modern property listing. Featuring open-concept architectural design, a gourmet chef\'s kitchen, and a private spa-inspired primary suite, this home is engineered for modern luxury living.\n\nTap the link in our bio or send a direct inquiry to schedule your private showing!';
+      reAlt =
+        'Luxury modern residential property listing now on the market. Tap the link in bio for photos and private showing details.';
+    }
+
+    const reTags = formatTags([
+      '#RealEstate', '#DreamHome', '#PropertyListing', '#HomeTour',
+      '#Realtor', '#HouseHunting', '#ModernHome', '#LuxuryRealEstate',
+      '#Architecture', '#HomeInspo', '#PropertyForSale', '#InteriorDesign',
+    ]);
+
+    return {
+      id: 'aezey_res_' + Date.now().toString(36),
+      timestamp: Date.now(),
+      urlSlug: 'luxury-residential-property-listing',
+      primaryCaption: stripFormulaLabels(stripInstructionEcho(rePrimary, customInstructions)),
+      alternativeCaption: stripFormulaLabels(stripInstructionEcho(reAlt, customInstructions)),
+      hashtags: {
+        industry: ['#RealEstate', '#Property', '#Realty', '#HousingMarket'],
+        niche: ['#DreamHome', '#PropertyListing', '#LuxuryRealEstate', '#HomeTour'],
+        topic: ['#ModernHome', '#HouseHunting', '#InteriorDesign', '#Architecture'],
+        audience: ['#HomeBuyers', '#Investors', '#HomeOwners', '#RealEstateLovers'],
+        productService: ['#ResidentialListing', '#HomeForSale', '#PrivateShowing'],
+        location: ['#PrimeLocation'],
+        all: reTags,
+      },
+      seoKeywords: {
+        mainTopic: ['luxury residential property', 'modern home listing', 'real estate investment'],
+        productService: ['open concept residential home', 'chef kitchen property listing', 'private home showing appointment'],
+        industry: ['residential real estate agency', 'luxury property brokerage', 'home listings market'],
+        audience: ['home buyers', 'property investors', 'families looking to relocate'],
+        brand: ['Luxury Residential Realty'],
+        searchIntent: ['luxury modern homes for sale', 'schedule private home tour listing', 'best residential real estate agent'],
+        all: [
+          'luxury residential property', 'modern home listing', 'real estate investment',
+          'open concept residential home', 'chef kitchen property listing', 'private home showing appointment',
+          'residential real estate agency', 'luxury property brokerage', 'home listings market',
+          'home buyers', 'property investors', 'families looking to relocate',
+          'luxury modern homes for sale', 'schedule private home tour listing', 'best residential real estate agent',
+        ],
+      },
+      callToAction: 'Schedule your private walkthrough tour of this luxury listing at the link in our bio today!',
+      contentSummary: `Residential real estate and modern home listing showcase in ${normalizedFormula} format highlighting architectural design, chef kitchen, and private suite.`,
+      detectedContext: {
+        detectedBrand: null,
+        hasBrand: false,
+        visibleText: bufferText.length > 0 ? bufferText : ['Luxury Residential Property Listing', 'Modern Architectural Home'],
+        detectedLanguage: 'English',
+        tone,
+        mainTopic: 'Luxury Residential Real Estate & Modern Home Property Listing',
+        promotionalIntent: 'Property Listing',
+        targetAudience: 'Home buyers, real estate investors, and relocating families',
+        visualHighlights: [
+          'Elegant residential architectural composition with bright natural lighting',
+          'Clear layout highlighting open-concept space and premium finishes',
+          'High-intent real estate call-to-action for private walkthrough bookings',
+        ],
+      },
+      platform,
+      tone,
+      formula: normalizedFormula,
+      isSimulatedFallback: true,
+      authNotice: notice,
+    };
+  }
+
+  // --- DOMAIN 11: DIGITAL MARKETING AGENCY (APEX GROWTH TEST DATA) ---
   if (isDigitalMarketing) {
-    const wantsBulletPoints = /bullet|points|list|service/i.test(cleanInstructions);
-
     let mktPrimary = '';
     let mktAlt = '';
-    let mktTags = [
-      '#DigitalMarketing', '#MarketingStrategy', '#OnlineBusiness', '#GrowthMarketing',
-      '#SocialMediaMarketing', '#SEOStrategy', '#ContentMarketing', '#ConversionOptimization',
-      '#DigitalMarketingTips', '#BusinessGrowth', '#MarketingHacks', '#ScaleYourBusiness',
-      '#Entrepreneurs', '#MarketingAgency', '#BusinessOwners', '#SmallBizTips',
-      '#MarketingServices', '#GrowthAgency', '#LeadGeneration', '#B2BMarketing',
-      '#GlobalMarketing', '#OnlineMarketing',
-    ];
 
-    if (formula === 'AIDA') {
+    if (normalizedFormula === 'AIDA') {
       mktPrimary = wantsBulletPoints
         ? 'If you\'re pouring hours into content only to hear crickets and watch sales stall, you\'re not alone. Our full-funnel digital marketing service is built for founders and brand owners who are ready to turn passive traffic into loyal paying customers without the guesswork. Here is how we build that high-converting growth engine for your brand:\n\n• High-Intent Search Engine Optimization (SEO) to rank for search queries your ideal buyers actually type\n• Friction-Free Conversion Funnels engineered to turn website visitors into qualified clients\n• Targeted Social Ad Campaigns across Meta, TikTok, and LinkedIn with zero wasted ad spend\n• Relatable Content & Copywriting Strategy that builds instant authority and long-term customer trust\n\nImagine waking up to a steady pipeline of qualified inbound leads and lower customer acquisition costs every single week. Stop leaving revenue on the table—tap the link in our bio or drop us a message today to claim your free strategy audit!'
         : 'If you\'re pouring hours into content only to hear crickets and watch sales stall, you\'re not alone. Our full-funnel digital marketing service is built for founders and brand owners who are ready to turn passive traffic into loyal paying customers without the guesswork. We pair high-intent SEO with friction-free conversion funnels and targeted social ad campaigns, so your ideal clients find you right when they\'re ready to buy. Imagine waking up to a steady pipeline of qualified inbound leads and lower customer acquisition costs every single week. Stop leaving revenue on the table. Tap the link in our bio or DM us today to claim your free strategy audit!';
       mktAlt =
         'Stop burning budget on dead-end traffic that never converts into paying customers. Our custom SEO and friction-free landing funnels connect you directly with ready-to-buy clients when they need you most. Experience predictable revenue growth and higher search visibility every month. Send us a message today to build your custom growth engine.';
-      mktTags = [
-        '#DigitalMarketingTips', '#SEOStrategy', '#ConversionFunnels', '#HighIntentMarketing',
-        '#ContentStrategy', '#B2BGrowth', '#GrowthMarketing', '#SocialMediaSEO',
-        '#MarketingForSmallBusiness', '#LeadGenerationTips', '#WebsiteTraffic', '#OnlineBusinessGrowth',
-        '#EntrepreneurTips', '#MarketingAgency', '#SearchEngineOptimization', '#InboundMarketing',
-        '#MarketingConsultant', '#ClientAcquisition', '#ScaleYourBusiness', '#DigitalStrategy',
-      ];
-    } else if (formula === 'PAS') {
+    } else if (normalizedFormula === 'PAS') {
       mktPrimary = wantsBulletPoints
         ? 'You\'re spending countless hours posting content, running tests, and updating your website, yet traffic bounces without buying. Every month that goes by without a high-converting funnel is money burned on unengaged clicks and missed opportunities that your competitors are actively claiming. Our proven digital marketing strategies fix every leak in your pipeline:\n\n• High-Intent Search Engine Optimization (SEO) to capture ready-to-buy searchers\n• Conversion Rate Optimization (CRO) turning traffic into paying customers\n• Laser-Targeted Social Ad Funnels across Meta, LinkedIn, and TikTok\n• Continuous Pipeline Analytics that lower your acquisition costs\n\nReady to finally scale your business without the guesswork? Tap the link in our bio or message us to get your customized funnel roadmap!'
         : 'You\'re spending countless hours posting content, running tests, and updating your website, yet traffic bounces without buying. Every month that goes by without a high-converting funnel is money burned on unengaged clicks and missed opportunities that your competitors are actively claiming. Our proven digital marketing strategies fix every leak in your pipeline. Through high-intent SEO, conversion rate optimization, and targeted social ad funnels, we turn passive visitors into loyal paying customers. Ready to finally scale your business? Tap the link in our bio or message us to get your customized funnel roadmap!';
       mktAlt =
         'Struggling with website traffic that never converts into paying customers? That\'s lost revenue and wasted time every single day. Our high-intent SEO and friction-free conversion funnels turn passive visitors into consistent revenue. Send us a message today to fix your pipeline.';
-      mktTags = ['#MarketingStrategy', '#ConversionOptimization', '#SEOGrowth', '#CustomerAcquisition', '#LeadGeneration', '#DigitalMarketing', '#OnlineFunnel'];
-    } else if (formula === 'BAB') {
+    } else if (normalizedFormula === 'BAB') {
       mktPrimary = wantsBulletPoints
         ? 'Inconsistent leads, unpredictable revenue, and feeling invisible in search results no matter how hard you work is exhausting. Imagine an automated, high-converting growth system where dream clients discover your brand at the top of Google and convert effortlessly every month. Our strategic digital marketing framework connects your current reality to predictable scale:\n\n• High-Intent Search Engine Optimization (SEO) for top search visibility\n• Frictionless Landing Funnels engineered for maximum conversion\n• Precision Ad Campaigns across Meta, TikTok, and LinkedIn\n• Continuous Pipeline Optimization to accelerate your revenue\n\nClaim your free strategy session at www.apexgrowth.agency or message us below to build your bridge to predictable growth!'
         : 'Inconsistent leads, unpredictable revenue, and feeling invisible in search results no matter how hard you work is exhausting. Imagine having an automated, high-converting growth system where dream clients discover your brand at the top of Google and convert effortlessly every month. Our strategic digital marketing framework connects your current reality to predictable scale. From semantic SEO to conversion-engineered campaigns, we build the bridge that moves your business forward. Claim your free strategy session at www.apexgrowth.agency or send us a message below!';
       mktAlt =
         'Tired of unpredictable leads and stagnant reach? Step into a thriving online pipeline that drives consistent revenue and high-intent clients. Our high-intent SEO and custom funnels bridge the gap to sustainable business growth. Tap the link in our bio to get started.';
-      mktTags = ['#BusinessTransformation', '#PredictableRevenue', '#DigitalMarketingTips', '#SEOGrowth', '#GrowthMarketing', '#OnlineScale', '#MarketingFramework'];
     } else if (wantsBulletPoints) {
       mktPrimary =
         'Ready to scale your brand with proven strategies that convert? Here is a breakdown of core growth drivers to maximize your reach:\n\n• High-Intent Search Engine Optimization (SEO): Rank for the exact keywords your target audience is searching for\n• Paid Social Ad Campaigns: Laser-focused audience targeting across Meta, TikTok, and LinkedIn\n• Conversion Rate Optimization (CRO): Transform website traffic into revenue with friction-free landing funnels\n• Content & Copywriting Strategy: Engaging storytelling that builds trust and drives organic engagement\n\nDrop a comment or DM "GROWTH" to audit your current digital marketing strategy!';
@@ -851,6 +1823,12 @@ export function generateIntelligentFallback(
       mktAlt =
         'Transform your online presence with actionable digital marketing tips! Focus on high-intent search terms, customer-first landing pages, and consistent organic content. Tap the link in bio to read our full strategy breakdown.';
     }
+
+    const mktTags = formatTags([
+      '#DigitalMarketing', '#MarketingStrategy', '#OnlineBusiness', '#GrowthMarketing',
+      '#SEOStrategy', '#ContentMarketing', '#ConversionOptimization', '#DigitalMarketingTips',
+      '#BusinessGrowth', '#MarketingAgency', '#LeadGeneration', '#B2BMarketing',
+    ]);
 
     return {
       id: 'aezey_mkt_' + Date.now().toString(36),
@@ -884,7 +1862,7 @@ export function generateIntelligentFallback(
         ],
       },
       callToAction: 'Comment "GROWTH" or visit www.apexgrowth.agency to claim your comprehensive marketing audit today!',
-      contentSummary: `Comprehensive digital marketing and SEO growth guide structured in ${formula !== 'standard' ? formula : 'engaging'} format highlighting search ranking and conversion pillars.`,
+      contentSummary: `Comprehensive digital marketing and SEO growth guide structured in ${normalizedFormula} format highlighting search ranking and conversion pillars.`,
       detectedContext: {
         detectedBrand: 'Apex Growth Digital',
         hasBrand: true,
@@ -909,53 +1887,35 @@ export function generateIntelligentFallback(
       },
       platform,
       tone,
-      formula,
+      formula: normalizedFormula,
       isSimulatedFallback: true,
       authNotice: notice,
     };
   }
 
+  // --- DOMAIN 12: TECH / SAAS (NEXUS AI TEST DATA) ---
   if (isTechnology) {
-    const wantsBulletPoints = /bullet|points|list|service/i.test(cleanInstructions);
-
     let techPrimary = '';
     let techAlt = '';
-    let techTags = [
-      '#ArtificialIntelligence', '#CloudComputing', '#EnterpriseTech', '#DevOps',
-      '#WorkflowAutomation', '#SaaSSolutions', '#AIAgents', '#AutonomousCloud',
-      '#TechInnovation', '#CloudInfrastructure', '#DeveloperTools', '#FutureOfWork',
-      '#SoftwareEngineers', '#CTOs', '#TechLeaders', '#StartupFounders',
-      '#NexusAI', '#CloudAutomation', '#SmartWorkflows',
-      '#GlobalTech', '#SiliconValley',
-    ];
 
-    if (formula === 'AIDA') {
+    if (normalizedFormula === 'AIDA') {
       techPrimary = wantsBulletPoints
         ? 'Ever feel like your engineering team spends more time babysitting cloud scripts than actually shipping features? Meet NEXUS AI CLOUD—the autonomous workflow platform that syncs multi-cloud infrastructure in real time with over 100 zero-setup connectors. Here is how our platform elevates your developer velocity:\n\n• Autonomous Intelligent Agents that slash routine DevOps tasks by over 70%\n• Real-Time Multi-Cloud Synchronization with zero configuration downtime\n• 100+ Zero-Setup API Connectors linking distributed databases in seconds\n• Enterprise-grade SOC-2 Type II Certified Security guaranteeing compliance and peace of mind\n\nFree your senior engineers from fragile deployment pipelines so they can build revenue-generating features. Ready to see how easy cloud automation can be? Grab your 14-day free trial at www.nexusai.cloud with no credit card required!'
         : 'Ever feel like your engineering team spends more time babysitting cloud scripts than actually shipping features? Meet NEXUS AI CLOUD—the autonomous workflow platform that syncs multi-cloud infrastructure in real time with over 100 zero-setup connectors. Ditch fragile deployment pipelines and manual firefighting so your developers can focus on building what matters, backed by enterprise-grade SOC-2 Type II security. Ready to see how easy cloud automation can be? Grab your 14-day free trial today at www.nexusai.cloud with no credit card required!';
       techAlt =
         'Stop manual cloud firefighting that drains your engineering resources. Nexus AI synchronizes multi-cloud environments in real-time, cutting 70% of DevOps overhead while elevating team velocity. Start your 14-day free trial today at www.nexusai.cloud.';
-      techTags = [
-        '#CloudComputing', '#DevOpsTools', '#WorkflowAutomation', '#SaaSSolutions',
-        '#ArtificialIntelligence', '#SoftwareEngineering', '#DeveloperTools', '#TechStartup',
-        '#CloudInfrastructure', '#AutomateWorkflows', '#TechInnovation', '#EnterpriseSoftware',
-        '#AIAgents', '#DevOpsEngineers', '#SoftwareArchitecture', '#BackendDevelopment',
-        '#ContinuousDeployment', '#CloudManagement', '#FullStackDev', '#TechCommunity',
-      ];
-    } else if (formula === 'PAS') {
+    } else if (normalizedFormula === 'PAS') {
       techPrimary = wantsBulletPoints
         ? 'Manual cloud workflows and broken deployment scripts are stalling your team\'s sprint velocity. Every hour your senior engineers spend firefighting cloud sync issues and API mismatches is engineering capital burned and product delivery delayed. NEXUS AI CLOUD automates enterprise workflows with complete operational peace of mind:\n\n• Real-Time Multi-Cloud Synchronization across all environments\n• Zero-Setup API Connectors linking your existing architecture instantly\n• Autonomous Intelligent Agents cutting operations overhead by over 70%\n• Enterprise-Grade Security with SOC-2 Type II verification\n\nAccelerate your releases and free your engineers—start your 14-day free trial at www.nexusai.cloud!'
         : 'Manual cloud workflows and broken deployment scripts are stalling your team\'s sprint velocity. Every hour your senior engineers spend firefighting cloud sync issues and API mismatches is engineering capital burned and product delivery delayed. NEXUS AI CLOUD automates enterprise workflows with real-time multi-cloud synchronization, zero-setup connectors, and intelligent agents. Accelerate your releases and reclaim engineering time—start your 14-day free trial at www.nexusai.cloud!';
       techAlt =
         'Pipeline bottlenecks and brittle deployment scripts slowing down your team? Wasting expensive engineering hours on manual DevOps costs you releases. Nexus AI Cloud automates multi-cloud orchestration autonomously so your team can deploy with confidence. Visit www.nexusai.cloud.';
-      techTags = ['#WorkflowAutomation', '#CloudAutomation', '#NexusAI', '#EngineeringEfficiency', '#DevOpsSolutions', '#SaaSInfrastructure'];
-    } else if (formula === 'BAB') {
+    } else if (normalizedFormula === 'BAB') {
       techPrimary = wantsBulletPoints
         ? 'Drowning in fragile custom scripts, fragmented cloud configs, and late-night operational firefighting is exhausting for any engineering team. Imagine a self-healing, unified multi-cloud ecosystem where data syncs in real-time and workflows execute autonomously. NEXUS AI CLOUD is the intelligent bridge that transforms operational friction into engineering speed:\n\n• Autonomous Intelligent Agents handling repetitive maintenance\n• Zero-Setup Connectors linking 100+ services without custom code\n• Real-Time Multi-Cloud Data Sync with zero downtime\n• Certified Enterprise Security with SOC-2 Type II compliance\n\nStart your 14-day free trial now at www.nexusai.cloud (No credit card required)!'
         : 'Drowning in fragile custom scripts, fragmented cloud configs, and late-night operational firefighting is exhausting for any engineering team. Imagine a self-healing, unified multi-cloud ecosystem where data syncs in real-time and workflows execute autonomously. NEXUS AI CLOUD is the intelligent bridge that transforms operational friction into seamless engineering speed. Start your 14-day free trial now at www.nexusai.cloud (No credit card required)!';
       techAlt =
         'Tired of fragile scripts and late-night DevOps fire drills? Move to an autonomous, self-healing cloud pipeline where workflows sync seamlessly. Nexus AI Cloud bridges the gap to reliable engineering speed. Start your free trial today at www.nexusai.cloud.';
-      techTags = ['#CloudTransformation', '#DevOpsAutomation', '#NexusAI', '#FutureOfWork', '#EnterpriseTech', '#AIAgents'];
     } else if (wantsBulletPoints) {
       techPrimary =
         'Cut operations friction and automate business workflows with NEXUS AI CLOUD! 🚀 Here is what the platform brings to your engineering team:\n\n• Real-Time Multi-Cloud Synchronization: Unify data pipelines with zero downtime\n• Zero-Setup API Connectors: Plug into 100+ enterprise databases instantly\n• Autonomous Intelligent Agents: Cut manual workflow operations by over 70%\n• Enterprise Security: Fully SOC-2 Type II and ISO-27001 certified\n\nStart your 14-day free trial today at www.nexusai.cloud (No credit card required)!';
@@ -968,6 +1928,12 @@ export function generateIntelligentFallback(
         'Transform your cloud infrastructure in minutes. Experience intelligent workflow automation with NEXUS AI. Zero credit card needed to begin—visit www.nexusai.cloud now.';
     }
 
+    const techTags = formatTags([
+      '#CloudComputing', '#DevOps', '#EnterpriseTech', '#WorkflowAutomation',
+      '#SaaSSolutions', '#CloudInfrastructure', '#DeveloperTools', '#TechStartup',
+      '#SoftwareEngineering', '#BackendDev', '#DevOpsTools', '#CloudAutomation',
+    ]);
+
     return {
       id: 'aezey_tec_' + Date.now().toString(36),
       timestamp: Date.now(),
@@ -975,9 +1941,9 @@ export function generateIntelligentFallback(
       primaryCaption: stripFormulaLabels(stripInstructionEcho(techPrimary, customInstructions)),
       alternativeCaption: stripFormulaLabels(stripInstructionEcho(techAlt, customInstructions)),
       hashtags: {
-        industry: ['#ArtificialIntelligence', '#CloudComputing', '#EnterpriseTech', '#DevOps'],
-        niche: ['#WorkflowAutomation', '#SaaSSolutions', '#AIAgents', '#AutonomousCloud'],
-        topic: ['#TechInnovation', '#CloudInfrastructure', '#DeveloperTools', '#FutureOfWork'],
+        industry: ['#CloudComputing', '#EnterpriseTech', '#DevOps', '#TechIndustry'],
+        niche: ['#WorkflowAutomation', '#SaaSSolutions', '#DeveloperTools', '#CloudAutomation'],
+        topic: ['#SoftwareEngineering', '#CloudInfrastructure', '#DevOpsTools', '#TechInnovation'],
         audience: ['#SoftwareEngineers', '#CTOs', '#TechLeaders', '#StartupFounders'],
         productService: ['#NexusAI', '#CloudAutomation', '#SmartWorkflows'],
         location: ['#GlobalTech', '#SiliconValley'],
@@ -1000,7 +1966,7 @@ export function generateIntelligentFallback(
         ],
       },
       callToAction: 'Claim your 14-day free trial at www.nexusai.cloud and automate your workflows today!',
-      contentSummary: `B2B enterprise SaaS product feature launch for Nexus AI structured in ${formula !== 'standard' ? formula : 'engaging'} format highlighting workflow automation and 14-day trial offer.`,
+      contentSummary: `B2B enterprise SaaS product feature launch for Nexus AI structured in ${normalizedFormula} format highlighting workflow automation and 14-day trial offer.`,
       detectedContext: {
         detectedBrand: 'Nexus AI',
         hasBrand: true,
@@ -1027,142 +1993,31 @@ export function generateIntelligentFallback(
       },
       platform,
       tone,
-      formula,
+      formula: normalizedFormula,
       isSimulatedFallback: true,
       authNotice: notice,
     };
   }
 
-  if (isFashion) {
-    const wantsBulletPoints = /bullet|points|list|service/i.test(cleanInstructions);
-
-    let fshPrimary = '';
-    let fshAlt = '';
-    let fshTags = [
-      '#Fashion', '#Retail', '#Apparel', '#Style',
-      '#Streetwear', '#HauteCouture', '#SummerDrop', '#UrbanFashion',
-      '#SummerDrop2026', '#FashionSale', '#ExclusiveDeals', '#OOTD',
-      '#FashionLovers', '#StyleInspo', '#Trendsetters', '#FashionAddict',
-      '#ABCFashion', '#StreetStyleClothing', '#DesignerWear',
-      '#DowntownMetro', '#GlobalShipping',
-    ];
-
-    if (formula === 'AIDA') {
-      fshPrimary = wantsBulletPoints
-        ? 'If you\'ve been looking for that effortless summer fit that actually keeps you cool while turning heads, you just found it. The ABC FASHION Summer Drop 2026 brings together handcrafted couture silhouettes and relaxed urban streetwear, cut from ultra-breathable premium textiles. Here is why this drop is an absolute must-have:\n\n• Handcrafted luxury streetwear silhouettes tailored for warm-weather breathability\n• Exclusive limited-time 40% OFF storewide with statement pieces starting at just $49.99\n• Premium designer textiles crafted for long-lasting fit, color, and shape\n• Fast global express shipping with eco-luxe packaging\n\nFeel the confidence of luxury statement wear without the traditional boutique markup. Shop the drop online at www.abcfashionstore.com or visit our Downtown Metro flagship store before your size sells out!'
-        : 'If you\'ve been looking for that effortless summer fit that actually keeps you cool while turning heads, you just found it. The ABC FASHION Summer Drop 2026 brings together handcrafted couture silhouettes and relaxed urban streetwear, cut from ultra-breathable premium textiles. Feel the confidence of luxury statement pieces starting at only $49.99, plus save an exclusive 40% OFF storewide for a limited time. Shop the drop online at www.abcfashionstore.com or visit our Downtown Metro flagship store before your size sells out!';
-      fshAlt =
-        'Summer style redefined with handcrafted couture streetwear from ABC Fashion. Enjoy 40% off storewide with statement pieces starting at $49.99. Tap the link in our bio to shop the drop today.';
-      fshTags = [
-        '#StreetwearStyle', '#SummerOutfits2026', '#OOTDInspo', '#StreetwearFashion',
-        '#SummerFashionTrends', '#FashionDrop', '#OutfitIdeas', '#AffordableLuxury',
-        '#TrendyStreetwear', '#StyleInspiration', '#FashionBlogger', '#CasualStreetwear',
-        '#MenswearStyle', '#WomensFashion', '#SummerDrop', '#StreetStyleInspo',
-        '#FitCheck', '#StreetwearCommunity', '#UrbanWear', '#FashionDeals',
-      ];
-    } else if (formula === 'PAS') {
-      fshPrimary = wantsBulletPoints
-        ? 'Struggling to find summer streetwear that actually balances luxury craftsmanship with all-day breathability and comfort? Cheap fast fashion loses its fit after two washes, while traditional luxury boutiques charge outrageous prices for everyday statement wear. ABC FASHION delivers handcrafted couture quality directly to your doorstep:\n\n• Premium breathable textiles engineered for all-day comfort\n• Handcrafted luxury streetwear silhouettes starting at just $49.99\n• Limited-time 40% OFF storewide across the entire collection\n• Durable designer stitching that preserves shape and color\n\nShop the Summer Drop now at www.abcfashionstore.com and elevate your everyday style!'
-        : 'Struggling to find summer streetwear that actually balances luxury craftsmanship with all-day comfort? Cheap fast fashion loses its fit after two washes, while traditional luxury boutiques charge outrageous prices for everyday statement wear. ABC FASHION delivers handcrafted couture quality at direct-to-consumer prices. Enjoy silhouettes starting at $49.99 with an exclusive 40% OFF storewide. Shop the Summer Drop now at www.abcfashionstore.com!';
-      fshAlt =
-        'Tired of fast fashion that fades and luxury prices that are out of reach? You shouldn\'t have to compromise on style or quality. Explore the ABC Fashion Summer Drop with 40% off handcrafted streetwear at www.abcfashionstore.com.';
-      fshTags = ['#StreetwearDrop', '#SustainableFashion', '#StyleMadeAffordable', '#OOTD', '#FashionLovers', '#ABCFashion'];
-    } else if (formula === 'BAB') {
-      fshPrimary = wantsBulletPoints
-        ? 'Feeling uninspired opening your closet and settling for the same faded, ill-fitting summer basics is frustrating. Imagine stepping out in head-turning streetwear silhouettes that feel luxurious, breathe in the heat, and make a statement everywhere you go. The exclusive ABC FASHION Summer Drop 2026 bridges that gap effortlessly:\n\n• Elevated couture essentials and modern streetwear starting at $49.99\n• Exclusive 40% OFF storewide for a limited time\n• Ultra-breathable premium fabrics tailored for summer comfort\n• Worldwide express shipping straight to your door\n\nExplore the collection at www.abcfashionstore.com and transform your summer wardrobe!'
-        : 'Feeling uninspired opening your closet and settling for the same faded, ill-fitting summer basics is frustrating. Imagine stepping out in head-turning streetwear silhouettes that feel luxurious, breathe in the heat, and make a statement everywhere you go. The exclusive ABC FASHION Summer Drop 2026 bridges that gap effortlessly with handcrafted essentials starting at $49.99 and 40% off storewide. Explore the collection at www.abcfashionstore.com!';
-      fshAlt =
-        'Say goodbye to uninspired summer basics and step into elevated couture streetwear that turns heads wherever you go. ABC Fashion Summer Drop 2026 delivers handcrafted style with 40% off storewide. Shop now at www.abcfashionstore.com.';
-      fshTags = ['#SummerGlowUp', '#ABCFashion', '#StreetwearDrop', '#StyleConfidence', '#WardrobeUpgrade', '#OOTD'];
-    } else if (wantsBulletPoints) {
-      fshPrimary =
-        'Step up your wardrobe game with the exclusive ABC FASHION Summer Drop 2026! 🔥 Here are the collection highlights:\n\n• Handcrafted couture and urban streetwear silhouettes starting at only $49.99\n• Limited-time exclusive 40% OFF storewide\n• Fast worldwide delivery with premium packaging\n\n📍 Visit our Downtown Metro flagship or shop online at www.abcfashionstore.com.\n📞 Call / WhatsApp orders: +1 (800) 555-2468.';
-      fshAlt =
-        'Your summer style upgrade just landed. Take 40% OFF the entire ABC FASHION collection starting at $49.99! Fast global shipping available. Tap the link in bio to shop the drop.';
-    } else {
-      fshPrimary =
-        'Step up your wardrobe game with the exclusive ABC FASHION Summer Drop 2026! 🔥 From statement streetwear to elevated couture essentials, explore handcrafted silhouettes starting at only $49.99. Enjoy an exclusive 40% OFF storewide for a limited time.\n\n📍 Visit our Downtown Metro flagship or shop online at www.abcfashionstore.com.\n📞 Call / WhatsApp orders: +1 (800) 555-2468.';
-      fshAlt =
-        'Your summer style upgrade just landed. Take 40% OFF the entire ABC FASHION collection starting at $49.99! Fast global shipping available. Tap the link in bio to shop the drop.';
-    }
-
-    return {
-      id: 'aezey_fsh_' + Date.now().toString(36),
-      timestamp: Date.now(),
-      urlSlug: 'abc-fashion-summer-drop-2026',
-      primaryCaption: stripFormulaLabels(stripInstructionEcho(fshPrimary, customInstructions)),
-      alternativeCaption: stripFormulaLabels(stripInstructionEcho(fshAlt, customInstructions)),
-      hashtags: {
-        industry: ['#Fashion', '#Retail', '#Apparel', '#Style'],
-        niche: ['#Streetwear', '#HauteCouture', '#SummerDrop', '#UrbanFashion'],
-        topic: ['#SummerDrop2026', '#FashionSale', '#ExclusiveDeals', '#OOTD'],
-        audience: ['#FashionLovers', '#StyleInspo', '#Trendsetters', '#FashionAddict'],
-        productService: ['#ABCFashion', '#StreetStyleClothing', '#DesignerWear'],
-        location: ['#DowntownMetro', '#GlobalShipping'],
-        all: fshTags,
-      },
-      seoKeywords: {
-        mainTopic: ['ABC Fashion summer drop', 'urban streetwear sale 2026', 'haute couture discounts'],
-        productService: ['designer streetwear apparel', 'summer collection clothing', 'trendy menswear womenswear'],
-        industry: ['fashion retail ecommerce', 'streetwear apparel brand', 'luxury fashion boutique'],
-        audience: ['urban fashion shoppers', 'streetwear enthusiasts', 'style conscious trendsetters'],
-        brand: ['ABC Fashion', 'ABC Haute Couture'],
-        searchIntent: ['buy ABC fashion online', 'summer streetwear 40 percent discount', 'downtown metro clothing boutique'],
-        all: [
-          'ABC Fashion summer drop', 'urban streetwear sale 2026', 'haute couture discounts',
-          'designer streetwear apparel', 'summer collection clothing', 'trendy menswear womenswear',
-          'fashion retail ecommerce', 'streetwear apparel brand', 'luxury fashion boutique',
-          'urban fashion shoppers', 'streetwear enthusiasts', 'style conscious trendsetters',
-          'ABC Fashion', 'ABC Haute Couture',
-          'buy ABC fashion online', 'summer streetwear 40 percent discount', 'downtown metro clothing boutique',
-        ],
-      },
-      callToAction: 'Shop the Summer Drop now at www.abcfashionstore.com or WhatsApp +1 (800) 555-2468 before pieces sell out!',
-      contentSummary: `High-impact retail promotional launch for ABC Fashion structured in ${formula !== 'standard' ? formula : 'engaging'} format highlighting Summer 2026 drop with 40% off pricing.`,
-      detectedContext: {
-        detectedBrand: 'ABC Fashion',
-        hasBrand: true,
-        visibleText: [
-          'ABC FASHION',
-          'HAUTE COUTURE & URBAN STREETWEAR',
-          'SUMMER DROP 2026',
-          'EXCLUSIVE 40% OFF STOREWIDE',
-          'Starting at $49.99',
-          '+1 (800) 555-2468',
-          'www.abcfashionstore.com',
-          'Downtown Metro Flagship',
-        ],
-        detectedLanguage: 'English',
-        tone,
-        mainTopic: 'Fashion & Retail Promotion - Summer Drop 2026',
-        promotionalIntent: 'High',
-        targetAudience: 'Fashion-forward shoppers, streetwear collectors, and summer deal hunters',
-        visualHighlights: [
-          'Prominent ABC Fashion typography and luxury branding',
-          'Highlighted 40% storewide discount with $49.99 entry price',
-          'Verified multi-channel contact: Phone, WhatsApp, Web, and Flagship store',
-        ],
-      },
-      platform,
-      tone,
-      formula,
-      isSimulatedFallback: true,
-      authNotice: notice,
-    };
-  }
-
+  // --- DOMAIN 13: URDU ACADEMY (ROSHAN ACADEMY TEST DATA) ---
   if (isUrduAcademy) {
     let urdPrimary =
       'روشن اکیڈمی آف ایکسیلنس میں تعلیمی سیشن 2026 کے لیے داخلے جاری ہیں! میٹرک، ایف ایس سی اور او لیول کے طلبہ کے لیے ماہر اساتذہ، جامع امتحانی تیاری اور پہلے 50 طلبہ کے لیے فیس میں 30 فیصد خصوصی رعایت۔\n\n📞 رابطہ نمبر: 0300-1234567\n📍 گلبرگ مین بلیوارڈ، لاہور۔ اپنے بچے کے روشن مستقبل کی جانب پہلا قدم آج ہی اٹھائیں!';
     let urdAlt =
       'کیا آپ تعلیمی امتحانات میں 100% شاندار نتائج چاہتے ہیں؟ روشن اکیڈمی میں داخلہ لیں اور 30 فیصد فیس میں رعایت کا فائدہ اٹھائیں۔ محدود نشستیں دستیاب ہیں! ابھی کال کریں: 0300-1234567۔';
 
-    if (formula === 'AIDA') {
+    if (normalizedFormula === 'AIDA') {
       urdPrimary =
         'کیا آپ اپنے بچے کے شاندار تعلیمی مستقبل اور بورڈ امتحانات میں ٹاپ پوزیشن کے خواہش مند ہیں؟ روشن اکیڈمی آف ایکسیلنس لا رہی ہے سیشن 2026 کے لیے داخلے—جہاں تجربہ کار اساتذہ، جدید تعلیمی ماحول، اور میٹرک، ایف ایس سی اور او لیول کی مکمل تیاری کروائی جاتی ہے۔ اپنے بچے کو ایک روشن تعلیمی مستقبل دیں اور پہلے 50 طلبہ کے لیے 30 فیصد خصوصی فیس رعایت سے فائدہ اٹھائیں۔ نشستیں محدود ہیں، آج ہی 0300-1234567 پر رابطہ کریں یا گلبرگ کیمپس تشریف لائیں!';
       urdAlt =
         'روشن اکیڈمی آف ایکسیلنس میں تعلیمی سیشن 2026 کے داخلے اور 30 فیصد خصوصی رعایت! ابھی رابطہ کریں: 0300-1234567۔';
     }
+
+    const urdTags = formatTags([
+      '#Education', '#Academies', '#UrduEducation', '#StudyInPakistan',
+      '#LahoreAcademies', '#MatricPreps', '#FScClasses', '#OLevelsLahore',
+      '#Admissions2026', '#ExamPrep', '#QualityEducation', '#Taleem',
+    ]);
 
     return {
       id: 'aezey_urd_' + Date.now().toString(36),
@@ -1177,14 +2032,7 @@ export function generateIntelligentFallback(
         audience: ['#PakistaniStudents', '#LahoreStudents', '#ParentsInPakistan', '#Taleem'],
         productService: ['#RoshanAcademy', '#BestTuitionCentre', '#CoachingClasses'],
         location: ['#Lahore', '#GulbergLahore', '#Pakistan'],
-        all: [
-          '#Education', '#Academies', '#UrduEducation', '#StudyInPakistan',
-          '#LahoreAcademies', '#MatricPreps', '#FScClasses', '#OLevelsLahore',
-          '#Admissions2026', '#ScholarshipOffer', '#ExamPrep', '#QualityEducation',
-          '#PakistaniStudents', '#LahoreStudents', '#ParentsInPakistan', '#Taleem',
-          '#RoshanAcademy', '#BestTuitionCentre', '#CoachingClasses',
-          '#Lahore', '#GulbergLahore', '#Pakistan',
-        ],
+        all: urdTags,
       },
       seoKeywords: {
         mainTopic: ['Roshan Academy admissions 2026', 'روشن اکیڈمی داخلے', 'best coaching academy in Lahore'],
@@ -1229,52 +2077,35 @@ export function generateIntelligentFallback(
       },
       platform,
       tone,
-      formula,
+      formula: normalizedFormula,
       isSimulatedFallback: true,
       authNotice: notice,
     };
   }
 
+  // --- DOMAIN 14: RESTAURANT & BIRYANI (KARACHI BITES TEST DATA) ---
   if (isFood) {
-    const wantsBulletPoints = /bullet|points|list|service/i.test(cleanInstructions);
     let foodPrimary = '';
     let foodAlt = '';
-    let foodTags = [
-      '#Foodie', '#FoodPorn', '#Restaurant', '#PakistaniFood',
-      '#BiryaniLove', '#KarachiFood', '#DesiFood', '#StreetFoodKarachi',
-      '#WeekendDeal', '#DhamakaOffer', '#BiryaniLovers', '#FoodGasm',
-      '#DesiFoodies', '#LateNightEats', '#FoodLoversPK', '#FoodBlogger',
-      '#KarachiBites', '#ChickenBiryani', '#FreeHomeDelivery',
-      '#Karachi', '#Pakistan', '#FoodStreet',
-    ];
 
-    if (formula === 'AIDA') {
+    if (normalizedFormula === 'AIDA') {
       foodPrimary = wantsBulletPoints
         ? 'Nothing hits the spot quite like steaming hot, authentic Biryani when weekend hunger strikes! Karachi Bites brings you our Weekend Dhamaka Deal—fragrant Basmati rice, perfectly spiced tender chicken, served alongside fresh raita and an ice-cold beverage. Here is what makes this meal deal unbeatable:\n\n• Authentic Chicken Biryani with traditional rich spices and long-grain Basmati rice\n• Chilled cold beverage + refreshing home-style mint raita included\n• Only Rs. 499/- complete meal with free home delivery citywide\n\nPure traditional aroma and bold flavor in every single bite. Don\'t let dinner wait! Call 0321-9876543 right now to order your hot biryani delivered in minutes!'
         : 'Nothing hits the spot quite like steaming hot, authentic Biryani when weekend hunger strikes! Karachi Bites brings you our Weekend Dhamaka Deal—fragrant Basmati rice, perfectly spiced tender chicken, served alongside fresh raita and an ice-cold beverage. Pure traditional aroma and bold flavor in every single bite, all for an unbeatable Rs. 499 complete meal deal with free home delivery right to your doorstep. Don\'t let dinner wait! Call 0321-9876543 right now to order your hot biryani delivered in minutes!';
       foodAlt =
         'Craving real spice that hits the spot? Karachi Bites special Chicken Biryani plus cold drink and raita delivers full authentic flavor for only Rs. 499. Call 0321-9876543 for instant free delivery!';
-      foodTags = [
-        '#BiryaniLovers', '#KarachiFood', '#KarachiEats', '#DesiFoodies',
-        '#ChickenBiryani', '#FoodDeliveryKarachi', '#StreetFoodKarachi', '#PakistaniStreetFood',
-        '#WeekendFoodDeals', '#BiryaniCravings', '#BestBiryani', '#FoodieFavorites',
-        '#DesiCuisine', '#KarachiRestaurants', '#LateNightFoodKarachi', '#FoodPornDaily',
-        '#BiryaniDeals', '#AuthenticSpices', '#HalalFoodies', '#PakistanFoodStreet',
-      ];
-    } else if (formula === 'PAS') {
+    } else if (normalizedFormula === 'PAS') {
       foodPrimary = wantsBulletPoints
         ? 'Tired of uninspiring dinners and overpriced takeout that fails to satisfy your authentic spice cravings? Settling for bland food on your weekend is a letdown—and spending hours in the kitchen defeats the whole point of relaxing with family. Karachi Bites Weekend Dhamaka Deal delivers complete satisfaction straight to your door:\n\n• Piping-hot special Chicken Biryani with authentic Karachi aroma\n• Chilled cold drink + fresh traditional raita included\n• Complete feast for only Rs. 499/- with zero delivery charges\n\n📞 Order Now: 0321-9876543 to get your hot biryani delivered in minutes!'
         : 'Tired of uninspiring dinners and overpriced takeout that fails to satisfy your authentic spice cravings? Settling for bland food on your weekend is a letdown—and spending hours in the kitchen defeats the whole point of relaxing with family. Karachi Bites Weekend Dhamaka Deal brings you authentic piping-hot Chicken Biryani with fresh raita and a chilled cold drink for just Rs. 499/- with superfast free delivery across the city. Call 0321-9876543 to get your hot biryani delivered right now!';
       foodAlt =
         'Weekend hunger with no dinner plans? Don\'t settle for bland food. Savor an authentic Karachi Biryani deal with cold drink and raita for only Rs. 499. Call 0321-9876543 for fast free delivery!';
-      foodTags = ['#BiryaniLovers', '#KarachiFood', '#WeekendDinner', '#FoodDelivery', '#DesiFlavors', '#StreetFoodKarachi'];
-    } else if (formula === 'BAB') {
+    } else if (normalizedFormula === 'BAB') {
       foodPrimary = wantsBulletPoints
         ? 'Wondering what to eat, staring into an empty fridge, and craving authentic desi spice after a long week is exhausting. Imagine savoring a steaming plate of authentic Chicken Biryani, perfectly paired with chilled raita and an ice-cold beverage, without ever stepping into the kitchen. Karachi Bites Weekend Dhamaka Deal bridges the gap effortlessly:\n\n• Authentic aromatic Chicken Biryani packed with traditional spices\n• Ice-cold drink + freshly prepared raita included\n• Only Rs. 499/- complete meal with free home delivery citywide\n\n📞 Call 0321-9876543 right now to claim your weekend deal!'
         : 'Wondering what to eat, staring into an empty fridge, and craving authentic desi spice is frustrating. Imagine savoring a steaming plate of authentic Chicken Biryani, perfectly paired with chilled raita and a cold drink, without ever stepping into the kitchen. Karachi Bites Weekend Dhamaka Deal bridges the gap for just Rs. 499/- complete meal with free home delivery citywide! Call 0321-9876543 right now to claim your weekend deal!';
       foodAlt =
         'Tired of an empty kitchen and cravings? Treat yourself to a steaming hot biryani feast at home. Karachi Bites delivers our Rs. 499 Dhamaka Deal with free delivery straight to your door. Call 0321-9876543 to order!';
-      foodTags = ['#BiryaniCravings', '#WeekendFeast', '#KarachiBites', '#FreeDelivery', '#DesiFood', '#KarachiFood'];
     } else if (wantsBulletPoints) {
       foodPrimary =
         'Craving authentic spice that hits the spot? Karachi Bites Weekend Dhamaka Deal is here! 🔥 Here is what is included in the deal:\n\n• Garma-garam authentic Chicken Biryani with traditional aroma\n• Chilled cold drink + fresh home-style raita\n• Only Rs. 499/- complete meal\n• Superfast free home delivery across the city\n\n📞 Order Now: 0321-9876543';
@@ -1286,6 +2117,12 @@ export function generateIntelligentFallback(
       foodAlt =
         'Biryani lovers alert! Karachi Bites Weekend Dhamaka Deal is here. Chicken Biryani + Cold Drink + Raita sirf Rs. 499! Abhi call karein aur enjoy karein.';
     }
+
+    const foodTags = formatTags([
+      '#BiryaniLovers', '#KarachiFood', '#KarachiEats', '#DesiFoodies',
+      '#ChickenBiryani', '#FoodDeliveryKarachi', '#StreetFoodKarachi', '#PakistaniFood',
+      '#WeekendFoodDeals', '#BiryaniCravings', '#BestBiryani', '#FoodStreet',
+    ]);
 
     return {
       id: 'aezey_fod_' + Date.now().toString(36),
@@ -1345,167 +2182,120 @@ export function generateIntelligentFallback(
       },
       platform,
       tone,
-      formula,
+      formula: normalizedFormula,
       isSimulatedFallback: true,
       authNotice: notice,
     };
   }
 
-  // Generic / Custom upload handler
+  // --- DOMAIN 15: GENERAL / CUSTOM BUSINESS & PRODUCT HANDLER ---
+  // Dynamically extract the exact subject from buffer text, file name, or instructions
   const rawFileName = fileName ? fileName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').trim() : '';
   const isDefaultName = !rawFileName || /^(img|image|video|photo|screenshot|file|pic|dsc|mov|mp4)[\d\s_-]*$/i.test(rawFileName);
-  const displayTopic = isDefaultName
-    ? (cleanInstructions.length > 3 && cleanInstructions.length < 50
-        ? cleanInstructions.replace(/^(keep|format|make|write|please)\s+/i, '').trim()
-        : (mediaType === 'video' ? 'Featured Video Showcase' : 'Featured Product Showcase'))
-    : rawFileName;
+
+  const detectedSubject = bufferText.length > 0
+    ? bufferText[0]
+    : (!isDefaultName
+        ? rawFileName
+        : (cleanInstructions.length > 3 && cleanInstructions.length < 50
+            ? cleanInstructions.replace(/^(keep|format|make|write|please|my|our)\s+/i, '').trim()
+            : (mediaType === 'video' ? 'Visual Project' : 'Custom Product Showcase')));
 
   const isVideo = mediaType === 'video';
-  const wantsBulletPoints = /bullet|points|list|service/i.test(cleanInstructions);
-  const topicSlug = formatUrlSlug(displayTopic);
-  const topicTag = displayTopic.replace(/[\s\-_]+/g, '');
-  const cleanProduct = displayTopic.charAt(0).toUpperCase() + displayTopic.slice(1);
+  const cleanSubjectTitle = detectedSubject.charAt(0).toUpperCase() + detectedSubject.slice(1);
+  const topicSlug = formatUrlSlug(detectedSubject);
+  const topicTag = detectedSubject.replace(/[^a-zA-Z0-9]/g, '');
 
-  let primaryCaptionText: string;
-  let alternativeCaptionText: string;
-  let genericTags = [
-    '#VisualMedia', '#CreativeShowcase', '#DigitalContent', '#TrendingNow',
-    `#${topicTag}`, '#VisualAesthetics', '#ModernStyle', '#ViralInspo',
-    '#CreativeDesign', '#VisualStorytelling', '#ContentStrategy', '#StyleInspo',
-    '#ContentCreators', '#CreativeCommunity', '#Trendsetters', '#DigitalMinds',
-    `#${topicTag}Features`, '#FeaturedPost', '#CuratedMedia',
-    '#GlobalReach', '#EverydayInspiration',
-  ];
+  let customPrimary = '';
+  let customAlt = '';
 
-  if (formula === 'AIDA') {
-    primaryCaptionText = wantsBulletPoints
-      ? (isVideo
-          ? `If you've been on the lookout for a standout ${cleanProduct} that actually delivers without the usual hype, you're going to love this. Designed specifically for anyone who values real-world quality, thoughtful details, and effortless performance, here is why everyone is raving about it:\n\n• Purpose-built craftsmanship engineered for reliable, everyday performance\n• Clean, thoughtful design that saves you time and simplifies your routine\n• Sleek modern aesthetic that turns heads while fitting right into your lifestyle\n• Community-tested durability that delivers authentic long-term value\n\nExperience the difference for yourself and see why it's quickly becoming a daily favorite. Tap the link in our bio to check it out or drop a comment below with your questions!`
-          : `If you've been on the lookout for a standout ${cleanProduct} that actually delivers without the usual hype, you're going to love this. Designed specifically for anyone who values real-world quality, thoughtful details, and effortless performance, here is why everyone is raving about it:\n\n• Purpose-built craftsmanship engineered for reliable, everyday performance\n• Clean, thoughtful design that saves you time and simplifies your routine\n• Sleek modern aesthetic that turns heads while fitting right into your lifestyle\n• Community-tested durability that delivers authentic long-term value\n\nExperience the difference for yourself and see why it's quickly becoming a daily favorite. Tap the link in our bio to check it out or drop a comment below with your questions!`)
-      : (isVideo
-          ? `If you've been on the hunt for a standout ${cleanProduct} that actually delivers on its promise, you're going to love this. Crafted specifically for people who appreciate thoughtful craftsmanship, clean aesthetics, and effortless everyday performance, it takes what you usually expect and elevates it across the board. You get a reliable, satisfying experience that fits right into your routine without any unnecessary complications or cut corners. Ready to see what makes it special? Check it out via the link in our bio, save this post for later, and let us know your thoughts in the comments below!`
-          : `If you've been on the hunt for a standout ${cleanProduct} that actually delivers on its promise, you're going to love this. Crafted specifically for people who appreciate thoughtful craftsmanship, clean aesthetics, and effortless everyday performance, it takes what you usually expect and elevates it across the board. You get a reliable, satisfying experience that fits right into your routine without any unnecessary complications or cut corners. Ready to see what makes it special? Check it out via the link in our bio, save this post for later, and let us know your thoughts in the comments below!`);
-
-    alternativeCaptionText =
-      `Meet ${cleanProduct}—your new daily favorite designed to elevate your everyday routine with clean style and reliable quality. Tap the link in our bio to explore all the details!`;
-
-    genericTags = [
-      `#${topicTag}`,
-      `#${topicTag}Online`,
-      `#${topicTag}Review`,
-      `#Best${topicTag}`,
-      `#Shop${topicTag}`,
-      `#${topicTag}Inspo`,
-      `#${topicTag}Life`,
-      '#TrendingNow',
-      '#MustHaves',
-      '#ViralFinds',
-      '#ProductRecommendations',
-      '#QualityFirst',
-      '#DailyEssentials',
-      '#ForYouPage',
-      '#ExplorePage',
-      '#CustomerFavorites',
-      '#TopRated',
-      '#DiscoverMore',
-      '#LifestyleUpgrade',
-      '#ThingsYouNeed',
-      '#NewDrop',
-      '#ShopOnline',
-    ];
-  } else if (formula === 'PAS') {
-    primaryCaptionText = wantsBulletPoints
-      ? (isVideo
-          ? `It's harder than ever to cut through the digital noise with video content that actually commands attention. Generic clips blend into the background, leaving your message unseen and your effort unnoticed in the endless scroll. "${displayTopic}" demonstrates how intentional pacing and focal contrast solve that struggle:\n\n• Instant scroll-stopping hook within the first 3 seconds\n• High-retention pacing that keeps viewers watching to the end\n• Crisp visual contrast engineered to command feed visibility\n\nSave this post for your next creative project and share your perspective in the comments below!`
-          : `It's harder than ever to cut through the digital noise with content that actually commands attention. Generic posts blend into the background, leaving your message unseen and your effort unnoticed in the endless scroll. "${displayTopic}" demonstrates the power of clean composition, strong focal contrast, and authentic human appeal:\n\n• High focal clarity that stops mindless scrolling\n• Intentional visual framing that communicates your message instantly\n• Polished aesthetic quality that builds immediate authority and trust\n\nSave this post for your next creative project and share your perspective in the comments!`)
-      : `It's harder than ever to cut through the digital noise with content that actually commands attention. Generic posts blend into the background, leaving your message unseen and your effort unnoticed in the endless scroll. "${displayTopic}" demonstrates the power of clean composition, strong focal contrast, and authentic human appeal. Save this post for your next creative project and share your perspective in the comments!`;
-
-    alternativeCaptionText =
-      `Getting lost in the endless scroll? Generic content gets ignored, but visual storytelling with "${displayTopic}" commands attention effortlessly. Double-tap if you agree!`;
-    genericTags = [`#${topicTag}`, '#StandOutOnline', '#ContentStrategy', '#VisualImpact', '#EngageYourAudience', '#CreativeShowcase'];
-  } else if (formula === 'BAB') {
-    primaryCaptionText = wantsBulletPoints
-      ? `Feeling stuck with repetitive feed visuals that struggle to get meaningful engagement is exhausting. Imagine having a vibrant, polished aesthetic that resonates deeply and sparks authentic dialogue across your community every day. "${displayTopic}" shows how intentional visual detail bridges that gap effortlessly:\n\n• Curated aesthetic detail that transforms ordinary feed posts\n• Intentional storytelling hooks that inspire genuine viewer comments\n• Clean, high-resolution finish that builds instant brand authority\n\nTap save to keep this in your collection and tell us your favorite element below!`
-      : `Feeling stuck with repetitive feed visuals that struggle to get meaningful engagement is exhausting. Imagine having a vibrant, polished aesthetic that resonates deeply and sparks authentic dialogue across your community every day. "${displayTopic}" shows how intentional visual detail bridges the gap between passive scrolling and active connection. Tap save to keep this in your collection and tell us your favorite element below!`;
-
-    alternativeCaptionText =
-      `Move past overlooked posts and step into captivating community engagement. Curated visual storytelling with "${displayTopic}" bridges the gap to authentic reach. Follow for daily inspiration!`;
-    genericTags = [`#${topicTag}`, '#VisualTransformation', '#ContentUpgrade', '#CreativeInspiration', '#CommunityGrowth', '#VisualMedia'];
+  if (normalizedFormula === 'AIDA') {
+    customPrimary = wantsBulletPoints
+      ? `If you've been looking for standout ${cleanSubjectTitle} crafted with genuine quality and attention to detail, this is designed for you. Built specifically for anyone who values reliability, thoughtful craftsmanship, and effortless performance, here is why it stands out:\n\n• Purpose-Built Quality engineered for reliable everyday use\n• Clean Modern Design that saves time and elevates your routine\n• Durable Craftsmanship offering authentic, long-term value\n• Attentive Detail designed around what customers actually need\n\nExperience the difference for yourself. Tap the link in our bio to learn more or drop your questions in the comments below!`
+      : `If you've been looking for standout ${cleanSubjectTitle} crafted with genuine quality and attention to detail, this is designed for you. Built for anyone who values reliability, clean design, and effortless everyday performance, it brings thoughtful craftsmanship into your routine. Experience the difference for yourself—tap the link in our bio to explore all the details!`;
+    customAlt =
+      `Discover ${cleanSubjectTitle}—crafted for everyday quality and reliable style. Tap the link in our bio to learn more!`;
+  } else if (normalizedFormula === 'PAS') {
+    customPrimary = wantsBulletPoints
+      ? `Dealing with low-quality options that break, fail to deliver, or complicate your day is exhausting. You shouldn't have to waste time and budget on solutions that don't hold up. "${cleanSubjectTitle}" solves that frustration directly:\n\n• High-Fidelity Craftsmanship engineered to prevent common headaches\n• Streamlined Experience designed for immediate, hassle-free results\n• Reliable Performance tested for long-lasting satisfaction\n\nStop settling for less—tap the link in our bio to discover the difference!`
+      : `Dealing with low-quality options that break or complicate your day is exhausting. You shouldn't have to waste time on solutions that fail to hold up. "${cleanSubjectTitle}" solves that frustration with reliable craftsmanship, clean design, and hassle-free performance. Stop settling for less—tap the link in our bio to discover the difference!`;
+    customAlt =
+      `Frustrated by low-quality alternatives? Discover how "${cleanSubjectTitle}" delivers the reliability you need. Tap the bio link today.`;
+  } else if (normalizedFormula === 'BAB') {
+    customPrimary = wantsBulletPoints
+      ? `Struggling with outdated methods and unreliable results that leave you frustrated is draining. Imagine stepping into an effortless workflow with clean quality and consistent results every day. "${cleanSubjectTitle}" bridges that gap seamlessly:\n\n• Modern Intuitive Design that simplifies your routine\n• High-Grade Materials delivering lasting satisfaction\n• Proven Everyday Utility that saves you time and effort\n\nBridge the gap to better results—tap the link in our bio to get started!`
+      : `Struggling with outdated methods and unreliable results that leave you frustrated is draining. Imagine stepping into an effortless routine with clean quality and consistent satisfaction every day. "${cleanSubjectTitle}" bridges that gap with modern craftsmanship and proven everyday utility. Tap the link in our bio to get started!`;
+    customAlt =
+      `Move past ordinary solutions and experience the difference with "${cleanSubjectTitle}". Tap our bio link for details.`;
   } else if (wantsBulletPoints) {
-    primaryCaptionText = isVideo
-      ? `Experience every dynamic moment in "${displayTopic}". Here are the key highlights:\n\n• High-energy visual pacing designed for instant engagement\n• Clean composition and rich color grading\n• Crafted for maximum social media reach\n\nWhat catches your eye first? Share your perspective below!`
-      : `Elevate your feed and brand presence with "${displayTopic}". Here is what makes this stand out:\n\n• High-resolution craftsmanship and intentional composition\n• Clean, modern aesthetic tailored for strong social impact\n• Curated visual details that resonate with your audience\n\nSave this post for inspiration and share with someone who appreciates this aesthetic!`;
-    alternativeCaptionText = isVideo
-      ? `In just ${Math.round(duration || 15)} seconds, see what makes this special. Don't scroll past—watch until the end! 🔥`
-      : `A fresh perspective on ${displayTopic}. Clean aesthetics meet actionable insights. Double tap if you agree! 🙌`;
+    customPrimary =
+      `Discover the standout craftsmanship of "${cleanSubjectTitle}". Here are the core highlights:\n\n• Thoughtful Design tailored for modern performance\n• Reliable Materials engineered for lasting quality\n• Seamless Integration into your everyday routine\n\nSave this post and tap the link in our bio to explore full details!`;
+    customAlt =
+      `Clean craftsmanship and proven performance in "${cleanSubjectTitle}". Tap the link in our bio to learn more!`;
   } else {
-    primaryCaptionText = isVideo
-      ? `Experience every dynamic moment in "${displayTopic}". Fast pacing, high impact, and curated visuals crafted to engage your audience.\n\nWhat stands out to you most? Drop your thoughts below!`
-      : `Elevate your feed with "${displayTopic}". High-resolution detail and intentional composition designed to captivate and engage smoothly.\n\nSave this post for inspiration and share with someone who needs to see this!`;
-    alternativeCaptionText = isVideo
-      ? `In just ${Math.round(duration || 15)} seconds, see what makes this special. Don't scroll past—watch until the end! 🔥`
-      : `A fresh perspective on ${displayTopic}. Clean aesthetics meet actionable insights. Double tap if you agree! 🙌`;
+    customPrimary =
+      `Discover the standout craftsmanship of "${cleanSubjectTitle}". High-grade materials, clean design, and intentional attention to detail provide reliable satisfaction in every use.\n\nSave this post and drop your perspective in the comments below!`;
+    customAlt =
+      `Clean craftsmanship and proven performance in "${cleanSubjectTitle}". Tap the link in our bio to learn more!`;
   }
+
+  const customTags = formatTags([
+    `#${topicTag}`, `#${topicTag}Style`, `#${topicTag}Design`, `#${topicTag}Inspo`,
+    '#Craftsmanship', '#DailyQuality', '#ModernDesign', '#CreativeWork',
+    '#QualityFirst', '#ProductDesign', '#DesignInspo', '#CuratedStyle',
+  ]);
 
   return {
     id: 'aezey_gen_' + Date.now().toString(36),
     timestamp: Date.now(),
     urlSlug: topicSlug,
-    primaryCaption: stripFormulaLabels(stripInstructionEcho(primaryCaptionText, customInstructions)),
-    alternativeCaption: stripFormulaLabels(stripInstructionEcho(alternativeCaptionText, customInstructions)),
+    primaryCaption: stripFormulaLabels(stripInstructionEcho(customPrimary, customInstructions)),
+    alternativeCaption: stripFormulaLabels(stripInstructionEcho(customAlt, customInstructions)),
     hashtags: {
-      industry: formula === 'AIDA'
-        ? ['#TrendingNow', '#DailyEssentials', '#QualityFirst', '#ShopOnline']
-        : ['#VisualMedia', '#CreativeShowcase', '#DigitalContent', '#TrendingNow'],
-      niche: formula === 'AIDA'
-        ? [`#${topicTag}`, `#${topicTag}Online`, `#${topicTag}Review`, `#Best${topicTag}`]
-        : [`#${topicTag}`, '#VisualAesthetics', '#ModernStyle', '#ViralInspo'],
-      topic: formula === 'AIDA'
-        ? ['#ProductRecommendations', '#ViralFinds', '#MustHaves', '#DiscoverMore']
-        : ['#CreativeDesign', '#VisualStorytelling', '#ContentStrategy', '#StyleInspo'],
-      audience: formula === 'AIDA'
-        ? ['#ForYouPage', '#ExplorePage', '#CustomerFavorites', '#TopRated']
-        : ['#ContentCreators', '#CreativeCommunity', '#Trendsetters', '#DigitalMinds'],
-      productService: [`#${topicTag}`, `#${topicTag}Inspo`, `#${topicTag}Features`, `#Shop${topicTag}`],
-      location: ['#GlobalReach', '#EverydayInspiration'],
-      all: genericTags,
+      industry: [`#${topicTag}`, '#Craftsmanship', '#ModernDesign', '#CreativeWork'],
+      niche: [`#${topicTag}Style`, `#${topicTag}Design`, '#QualityFirst', '#ProductDesign'],
+      topic: [`#${topicTag}Inspo`, '#CuratedStyle', '#DesignInspo', '#EverydayEssentials'],
+      audience: ['#DesignLovers', '#DiscerningBuyers', '#CreativeCommunity', '#ProductEnthusiasts'],
+      productService: [`#${topicTag}`, `#${topicTag}Features`, `#${topicTag}Details`],
+      location: ['#WorldwideReach'],
+      all: customTags,
     },
     seoKeywords: {
-      mainTopic: [`${displayTopic} content strategy`, 'visual media creation', 'social media engagement'],
-      productService: ['dynamic content generation', 'high converting social copy', 'targeted keyword tags'],
-      industry: ['digital marketing', 'content publishing', 'multimedia design'],
-      audience: ['digital creators', 'social media managers', 'brand founders'],
-      brand: [displayTopic],
-      searchIntent: [`how to optimize ${displayTopic} for social media`, 'viral captions and hashtags generator', 'boost social media impressions'],
+      mainTopic: [`${detectedSubject} features`, `${detectedSubject} design`, `${detectedSubject} quality`],
+      productService: [`handcrafted ${detectedSubject}`, `custom ${detectedSubject} service`, `modern ${detectedSubject} design`],
+      industry: [`${detectedSubject} industry`, 'product craftsmanship', 'custom merchandise design'],
+      audience: ['quality conscious buyers', 'product enthusiasts', 'modern design lovers'],
+      brand: [cleanSubjectTitle],
+      searchIntent: [`best ${detectedSubject} online`, `where to buy ${detectedSubject}`, `how to choose ${detectedSubject}`],
       all: [
-        `${displayTopic} content strategy`, 'visual media creation', 'social media engagement',
-        'dynamic content generation', 'high converting social copy', 'targeted keyword tags',
-        'digital marketing', 'content publishing', 'multimedia design',
-        'digital creators', 'social media managers', 'brand founders',
-        displayTopic,
-        `how to optimize ${displayTopic} for social media`, 'viral captions and hashtags generator', 'boost social media impressions',
+        `${detectedSubject} features`, `${detectedSubject} design`, `${detectedSubject} quality`,
+        `handcrafted ${detectedSubject}`, `custom ${detectedSubject} service`, `modern ${detectedSubject} design`,
+        `${detectedSubject} industry`, 'product craftsmanship', 'custom merchandise design',
+        'quality conscious buyers', 'product enthusiasts', 'modern design lovers',
+        cleanSubjectTitle,
+        `best ${detectedSubject} online`, `where to buy ${detectedSubject}`, `how to choose ${detectedSubject}`,
       ],
     },
-    callToAction: 'Follow for more daily inspiration, save this post, and let us know your perspective in the comments!',
-    contentSummary: `Multi-modal analysis for ${isVideo ? 'video clip' : 'visual image'} ("${displayTopic}") structured in ${formula !== 'standard' ? formula : 'engaging'} format highlighting pacing and cross-platform engagement hooks.`,
+    callToAction: 'Tap the link in our bio to learn more, save this post, and share your perspective below!',
+    contentSummary: `Content analysis for ${isVideo ? 'video' : 'visual media'} ("${cleanSubjectTitle}") structured in ${normalizedFormula} format highlighting craftsmanship and functional details.`,
     detectedContext: {
       detectedBrand: null,
       hasBrand: false,
-      visibleText: [displayTopic],
+      visibleText: bufferText.length > 0 ? bufferText : [cleanSubjectTitle],
       detectedLanguage: 'English',
       tone,
-      mainTopic: `${displayTopic} - Content & Visual Engagement`,
-      promotionalIntent: 'Medium',
-      targetAudience: 'Engaged social media followers, digital creators, and industry professionals',
+      mainTopic: `${cleanSubjectTitle} - Craftsmanship & Utility`,
+      promotionalIntent: 'Product Showcase',
+      targetAudience: 'Engaged followers, discerning buyers, and industry enthusiasts',
       visualHighlights: [
-        `High visual fidelity detected in ${fileName || 'uploaded asset'}`,
-        isVideo ? `Multi-frame video temporal coherence across ${Math.round(duration || 15)}s duration` : 'Balanced color harmony and strong focal composition',
-        'Optimized for multi-platform distribution',
+        `High visual fidelity detected in ${fileName || 'uploaded media asset'}`,
+        isVideo ? `Multi-frame temporal consistency across ${Math.round(duration || 15)}s duration` : 'Balanced color harmony, focal contrast, and clean composition',
+        'Optimized for multi-platform distribution and discoverability',
       ],
     },
     platform,
     tone,
-    formula,
+    formula: normalizedFormula,
     isSimulatedFallback: true,
     authNotice: notice,
   };

@@ -359,4 +359,361 @@ export const SAMPLE_PRESETS: SamplePreset[] = [
       return canvas.toDataURL('image/jpeg', 0.9);
     },
   },
+  {
+    id: 'academic-research',
+    title: 'Academic: "Study & Research Guide"',
+    category: 'Education & Academics',
+    language: 'English',
+    description: 'Tests academic topic detection, study guide captions, short relevant tags, and academic URL slug.',
+    brandExpected: 'Academic Research Guide',
+    generateDataUrl: () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 800;
+      const ctx = canvas.getContext('2d')!;
+
+      const grad = ctx.createLinearGradient(0, 0, 800, 800);
+      grad.addColorStop(0, '#1e1b4b');
+      grad.addColorStop(0.5, '#312e81');
+      grad.addColorStop(1, '#4338ca');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 800, 800);
+
+      ctx.strokeStyle = '#a5b4fc';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(30, 30, 740, 740);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 44px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('ACADEMIC RESEARCH & STUDY GUIDE', 400, 150);
+
+      ctx.font = '24px sans-serif';
+      ctx.fillStyle = '#c7d2fe';
+      ctx.fillText('High-Yield University Learning & Exam Methods', 400, 200);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.roundRect(140, 270, 520, 290, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#818cf8';
+      ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillText('Core Academic Pillars:', 180, 320);
+
+      ctx.font = '21px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('• Active Recall & Spaced Repetition Protocols', 180, 375);
+      ctx.fillText('• Literature Review & Paper Synthesis Methods', 180, 425);
+      ctx.fillText('• Thesis & Dissertation Drafting Frameworks', 180, 475);
+      ctx.fillText('• Structured Problem-Solving for Quantitative Exams', 180, 525);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#e0e7ff';
+      ctx.font = '22px sans-serif';
+      ctx.fillText('📚 Higher Education Research & Academic Excellence', 400, 640);
+      ctx.fillText('🎓 Access University Study Templates & Revision Guides', 400, 685);
+
+      return canvas.toDataURL('image/jpeg', 0.9);
+    },
+  },
+  {
+    id: 'cushioned-shoes',
+    title: 'Shoes: "Running Sneakers"',
+    category: 'Footwear & Athletic',
+    language: 'English',
+    description: 'Tests shoe/footwear identification, cushioning benefits, short tags (#Sneakers, #RunningShoes), and shoe slug.',
+    brandExpected: 'Performance Footwear',
+    generateDataUrl: () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 800;
+      const ctx = canvas.getContext('2d')!;
+
+      const grad = ctx.createLinearGradient(0, 0, 800, 800);
+      grad.addColorStop(0, '#0c4a6e');
+      grad.addColorStop(0.5, '#0369a1');
+      grad.addColorStop(1, '#0284c7');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 800, 800);
+
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(30, 30, 740, 740);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 50px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('CUSHIONED RUNNING SNEAKERS', 400, 150);
+
+      ctx.font = '24px sans-serif';
+      ctx.fillStyle = '#bae6fd';
+      ctx.fillText('High-Rebound Dual-Density Athletic Footwear', 400, 200);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.roundRect(140, 270, 520, 270, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText('Performance Footwear Specs:', 180, 320);
+
+      ctx.font = '21px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('• Responsive Dual-Density Cloud Foam Midsoles', 180, 375);
+      ctx.fillText('• Breathable Engineered Mesh Knit Upper', 180, 425);
+      ctx.fillText('• Ergonomic Arch Support & Anti-Fatigue Shank', 180, 475);
+      ctx.fillText('• Durable Multi-Surface High-Grip Rubber Outsole', 180, 520);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#f0f9ff';
+      ctx.font = '22px sans-serif';
+      ctx.fillText('👟 Built for Long Miles, Commutes & Daily Streetwear', 400, 640);
+      ctx.fillText('⚡ Engineered for Stride Comfort & Impact Protection', 400, 685);
+
+      return canvas.toDataURL('image/jpeg', 0.9);
+    },
+  },
+  {
+    id: 'streetwear-clothing',
+    title: 'Clothing: "Streetwear Apparel"',
+    category: 'Fashion & Clothing',
+    language: 'English',
+    description: 'Tests apparel identification, breathable fabric highlights, clothing hashtags, and clothing slug.',
+    brandExpected: 'Urban Apparel Collection',
+    generateDataUrl: () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 800;
+      const ctx = canvas.getContext('2d')!;
+
+      const grad = ctx.createLinearGradient(0, 0, 800, 800);
+      grad.addColorStop(0, '#1c1917');
+      grad.addColorStop(0.5, '#292524');
+      grad.addColorStop(1, '#44403c');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 800, 800);
+
+      ctx.strokeStyle = '#d6d3d1';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(30, 30, 740, 740);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 50px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('URBAN STREETWEAR APPAREL', 400, 150);
+
+      ctx.font = '24px sans-serif';
+      ctx.fillStyle = '#d6d3d1';
+      ctx.fillText('Handcrafted Premium Breathable Cotton & Modern Tailoring', 400, 200);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.roundRect(140, 270, 520, 260, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#a8a29e';
+      ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillText('Garment Craftsmanship:', 180, 320);
+
+      ctx.font = '21px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('• 100% Heavyweight Pre-Shrunk Breathable Cotton', 180, 375);
+      ctx.fillText('• Tailored Modern Silhouette with Relaxed Fit Drape', 180, 425);
+      ctx.fillText('• Reinforced Double-Needle Seams Built to Last', 180, 475);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#e7e5e4';
+      ctx.font = '22px sans-serif';
+      ctx.fillText('👕 Timeless Streetwear Essentials & Everyday Statement Fits', 400, 640);
+      ctx.fillText('🌐 Shop Modern Apparel Drops Online', 400, 685);
+
+      return canvas.toDataURL('image/jpeg', 0.9);
+    },
+  },
+  {
+    id: 'gourmet-cooking',
+    title: 'Cooking: "Gourmet Pasta Recipe"',
+    category: 'Culinary & Cooking',
+    language: 'English',
+    description: 'Tests recipe/cooking identification, fresh ingredient highlights, culinary hashtags, and cooking slug.',
+    brandExpected: 'Gourmet Kitchen Recipe',
+    generateDataUrl: () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 800;
+      const ctx = canvas.getContext('2d')!;
+
+      const grad = ctx.createLinearGradient(0, 0, 800, 800);
+      grad.addColorStop(0, '#78350f');
+      grad.addColorStop(0.5, '#92400e');
+      grad.addColorStop(1, '#b45309');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 800, 800);
+
+      ctx.strokeStyle = '#fde68a';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(30, 30, 740, 740);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 48px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('GOURMET HOMEMADE PASTA RECIPE', 400, 150);
+
+      ctx.font = '24px sans-serif';
+      ctx.fillStyle = '#fef3c7';
+      ctx.fillText('Authentic Italian Flavors in Under 30 Minutes', 400, 200);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.roundRect(140, 270, 520, 270, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#fde68a';
+      ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillStyle = '#fde68a';
+      ctx.fillText('Recipe Secrets:', 180, 320);
+
+      ctx.font = '21px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('• Fresh Farm-Sourced Basil, Garlic & San Marzano Tomatoes', 180, 375);
+      ctx.fillText('• Al Dente Bronze-Cut Pasta with Starchy Emulsified Sauce', 180, 425);
+      ctx.fillText('• Aged Parmigiano-Reggiano and Cold-Pressed Extra Virgin Olive Oil', 180, 475);
+      ctx.fillText('• Easy Scratch Cooking for Weeknight Dinners', 180, 520);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#fffbeb';
+      ctx.font = '22px sans-serif';
+      ctx.fillText('🍝 Scratch Kitchen Flavor Straight to Your Dinner Table', 400, 640);
+      ctx.fillText('📖 Save for Tonight\'s Cozy Homemade Meal', 400, 685);
+
+      return canvas.toDataURL('image/jpeg', 0.9);
+    },
+  },
+  {
+    id: 'smm-marketing',
+    title: 'SMM: "Social Media Agency"',
+    category: 'Social Media Marketing',
+    language: 'English',
+    description: 'Tests social media marketing identification, reel hooks, short SMM tags, and marketing slug.',
+    brandExpected: 'Social Media Growth Agency',
+    generateDataUrl: () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 800;
+      const ctx = canvas.getContext('2d')!;
+
+      const grad = ctx.createLinearGradient(0, 0, 800, 800);
+      grad.addColorStop(0, '#581c87');
+      grad.addColorStop(0.5, '#6b21a8');
+      grad.addColorStop(1, '#7e22ce');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 800, 800);
+
+      ctx.strokeStyle = '#d8b4fe';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(30, 30, 740, 740);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 46px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('SOCIAL MEDIA MARKETING STRATEGY', 400, 150);
+
+      ctx.font = '24px sans-serif';
+      ctx.fillStyle = '#f3e8ff';
+      ctx.fillText('Organic Growth Funnels, Reels & Client Acquisition', 400, 200);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.roundRect(140, 270, 520, 260, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#c084fc';
+      ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillStyle = '#f0abfc';
+      ctx.fillText('Agency Growth Deliverables:', 180, 320);
+
+      ctx.font = '21px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('• 3-Second Scroll-Stopping Video Hooks for Reels & TikTok', 180, 375);
+      ctx.fillText('• Semantic Social SEO Optimization for Discovery Feeds', 180, 425);
+      ctx.fillText('• Direct-Message Lead Funnels Converting Viewers into Clients', 180, 475);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#faf5ff';
+      ctx.font = '22px sans-serif';
+      ctx.fillText('📈 Turn Followers into Predictable Inbound Bookings', 400, 640);
+      ctx.fillText('💼 DM "GROWTH" for Full Social Media Channel Audit', 400, 685);
+
+      return canvas.toDataURL('image/jpeg', 0.9);
+    },
+  },
+  {
+    id: 'dental-clinic',
+    title: 'Clinic: "Family Dental Care"',
+    category: 'Healthcare & Business',
+    language: 'English',
+    description: 'Tests business identification, dental services, short relevant healthcare tags, and clinic slug.',
+    brandExpected: 'Family Dental Clinic',
+    generateDataUrl: () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 800;
+      const ctx = canvas.getContext('2d')!;
+
+      const grad = ctx.createLinearGradient(0, 0, 800, 800);
+      grad.addColorStop(0, '#042f2e');
+      grad.addColorStop(0.5, '#115e59');
+      grad.addColorStop(1, '#0f766e');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 800, 800);
+
+      ctx.strokeStyle = '#5eead4';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(30, 30, 740, 740);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 50px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('FAMILY DENTAL CARE CLINIC', 400, 150);
+
+      ctx.font = '24px sans-serif';
+      ctx.fillStyle = '#99f6e4';
+      ctx.fillText('Gentle Preventive Dentistry & Smile Whitening', 400, 200);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.roundRect(140, 270, 520, 260, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#2dd4bf';
+      ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillStyle = '#5eead4';
+      ctx.fillText('Dental Patient Services:', 180, 320);
+
+      ctx.font = '21px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('• Gentle Preventive Cleanings & Digital Screenings', 180, 375);
+      ctx.fillText('• In-Office Professional Teeth Whitening Treatments', 180, 425);
+      ctx.fillText('• Clear Aligners & Cosmetic Restorations', 180, 475);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ccfbf1';
+      ctx.font = '22px sans-serif';
+      ctx.fillText('🦷 Compassionate Care for Patients of All Ages', 400, 640);
+      ctx.fillText('📞 Call to Book Your Dental Exam & Whitening Visit', 400, 685);
+
+      return canvas.toDataURL('image/jpeg', 0.9);
+    },
+  },
 ];
