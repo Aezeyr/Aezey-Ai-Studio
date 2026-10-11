@@ -66,7 +66,7 @@ export async function onRequestPost(contextOrRequest: any, maybeEnv?: any) {
 
   const clientKey = payload?.apiKey || headerKey;
   const activeKey =
-    resolveApiKey(clientKey || envApiKey, env) ||
+    resolveApiKey(clientKey, env) ||
     resolveApiKey(clientKey, contextOrRequest);
 
   try {
