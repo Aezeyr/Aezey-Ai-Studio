@@ -88,7 +88,7 @@ const RESPONSE_SCHEMA = {
     urlSlug: {
       type: Type.STRING,
       description:
-        'Clean, readable, lowercase, hyphen-separated SEO slug based strictly on the uploaded media topic, e.g. spss-data-analysis-excel-presentation-services or cushioned-running-shoes. Never include application names.',
+        'Clean, readable, lowercase, hyphen-separated SEO slug based strictly on the uploaded media topic. Never include application names.',
     },
     hashtags: {
       type: Type.OBJECT,
@@ -96,12 +96,12 @@ const RESPONSE_SCHEMA = {
         industry: {
           type: Type.ARRAY,
           items: { type: Type.STRING },
-          description: 'Short 1-2 word relevant industry tags matching the uploaded media (e.g. #DataAnalysis, #AcademicResearch)',
+          description: 'Short 1-2 word relevant industry tags strictly matching the uploaded media',
         },
         niche: {
           type: Type.ARRAY,
           items: { type: Type.STRING },
-          description: 'Short 1-2 word niche tags matching specific visual subjects or tools (e.g. #SPSS, #Excel, #PowerPoint)',
+          description: 'Short 1-2 word niche tags strictly matching specific visual subjects or tools in the media',
         },
         topic: {
           type: Type.ARRAY,
@@ -123,7 +123,7 @@ const RESPONSE_SCHEMA = {
           type: Type.ARRAY,
           items: { type: Type.STRING },
           description:
-            'A small, sensible curated set of 5-8 short, relevant hashtags strictly related to the actual uploaded media (e.g. #SPSS #DataAnalysis #Excel #PowerPoint #AcademicResearch). NEVER sentence-like hashtags such as #SPSSDataAnalysisAzeemAcademicHubPresentationSupport. NEVER generic viral fillers like #ShopOnline, #MustHaves, #ForYouPage, #TrendingNow. NEVER app names (#AEZEY), NO formula tags. Max 18 characters per tag.',
+            'A small, sensible curated set of 5-8 short, relevant hashtags strictly related to the actual uploaded media. NEVER sentence-like composite hashtags. Strictly avoid generic viral fillers (#fyp, #viral, #trending, #shoponline, #musthaves, #foryoupage). NEVER app names (#AEZEY), NO formula tags. Max 18 characters per tag.',
         },
       },
       required: ['industry', 'niche', 'topic', 'all'],
@@ -141,7 +141,7 @@ const RESPONSE_SCHEMA = {
           type: Type.ARRAY,
           items: { type: Type.STRING },
           description:
-            'High-intent search terms strictly describing the actual subject, products, or services shown in the media (e.g. spss data analysis service, excel statistical modeling, powerpoint presentation design). Never include application names or unrelated trendy terms.',
+            '2 to 5 high-intent search phrases strictly describing the actual subject, products, or services shown in the media. Never include application names or unrelated trendy terms.',
         },
       },
       required: ['mainTopic', 'industry', 'all'],
@@ -601,86 +601,42 @@ export async function analyzeContent(
   }
 
   const promptText = `
-You are the advanced multimodal media analysis and content generation engine of "AEZEY AI Studio".
+You are the multimodal analysis and content engine of "AEZEY AI Studio". Your task is to analyze ONE uploaded image or video, accurately understand its visual content, and generate relevant social media content.
 
-${mediaType === 'video' && videoFrames && videoFrames.length > 0 ? `VIDEO KEYFRAME DIRECTIVE:
-You have been provided with ${videoFrames.length} chronological keyframe snapshots captured across the duration of the uploaded video (${duration ? Math.round(duration) + 's' : '≤ 30s'}). Thoroughly inspect the sequential visual progression, demonstrated products/services, actions, and any readable screen overlays across all frames.` : ''}
+IMPORTANT INSTRUCTIONS:
+1. Do NOT default to, memory-recall, or reference any specific domains, subjects, or past test examples (such as SPSS, data analysis, shoes, coffee, etc.).
+2. The uploaded media is your ONLY source of truth. Rely 100% on what is actually visible or audible in the media.
+3. If the media shows clothing, talk ONLY about clothing. If it shows food, talk ONLY about food. If it shows automotive, talk ONLY about automotive. Do not invent details, prices, or contact numbers unless visible or provided by the user.
 
-CORE MEDIA ANALYSIS & CONTENT GENERATION DIRECTIVES (HIGHEST PRIORITY):
-1. THE UPLOADED MEDIA IS THE PRIMARY SOURCE OF TRUTH:
-   - Carefully examine the actual visual content: identify the main subject, topic, visible products or services, visible text, headings, signs, diagrams, software/tools, and logos.
-   - For images: Inspect all visual elements, diagrams, text overlays, products, or services shown (e.g. SPSS statistical outputs, Excel spreadsheets, PowerPoint slides, thesis research guidelines, streetwear clothing, athletic shoes, culinary dishes, dental treatments, coffee espresso machines, etc.).
-   - If text, numbers, offers, or brand logos are visible, transcribe them accurately. Do NOT invent brands, products, services, or phone numbers not shown.
-   - Ground all generated captions, hashtags, and keywords strictly on this visual analysis.
+PROCESS:
+1. OBSERVE: Identify the main subject, readable text, logos, colors, product features, and setting from the image or video.
+${mediaType === 'video' && videoFrames && videoFrames.length > 0 ? `   - Video Analysis: You have been provided with ${videoFrames.length} chronological keyframe snapshots captured across the duration (${duration ? Math.round(duration) + 's' : '≤ 30s'}). Inspect the progression across beginning, middle, and end frames to understand the overall video.` : ''}
+2. CLASSIFY: Determine the domain and subject dynamically (commerce, fashion, education, food, real estate, technology, healthcare, etc.) strictly based on visual proof.
+3. COPYWRITING FORMULAS: When requested, structure the content using the selected copywriting arc (${formula || 'standard'}):
+   - AIDA: Attention (hook) -> Interest (details) -> Desire (benefits) -> Action (CTA).
+   - PAS: Problem -> Agitation -> Solution -> Action (CTA).
+   - BAB: Before -> After -> Bridge -> Action (CTA).
+   - Standard: Natural, engaging copy highlighting the visual subject.
+   - NEVER print formula names or section labels (e.g. "Attention:", "Interest:", "Problem:", "Solution:", "Before:", "After:") in the output prose.
 
-2. GENERATE A NATURAL, HUMAN-SOUNDING CAPTION MATCHING THE UPLOADED CONTENT:
-   - Write fluent, natural social media copy that speaks specifically about the exact uploaded content, products, or services.
-   - Do NOT use generic, unrelated templates or boilerplate filler (never default to generic craftsmanship unless genuinely about craft).
-   - The writing must feel authentic, relatable, and human—like a real copywriter or passionate creator wrote it.
-   - Accurately communicate the content and explain the advertised service or product when supported by the uploaded media.
+OUTPUT REQUIREMENTS:
+- Primary Caption: Written in engaging, natural language matching the platform (${platform}) and tone (${tone}). Include real visual evidence in the first few lines.
+- Alternative Caption: A distinctively different hook and structure, avoiding simple rephrasing.
+- Hashtag Strategy: Generate 5 to 8 relevant hashtags matching the visual subject. Strictly avoid generic viral tags (#fyp, #viral, #trending, #foryoupage, #shoponline, #musthaves). Never include app names (#AEZEY) or formula names.
+- SEO Keywords & Slug: 2 to 5 search phrases relevant to the actual subject, and a clean URL-friendly slug.
+- Call to Action: Short, natural action step relevant to the content.
+- Special Instructions:
+${customInstructions ? `  * User formatting & requirements: "${customInstructions}" (Apply this formatting, e.g. bullet points, seamlessly. NEVER echo or quote the instruction text itself into the caption).` : '  * Follow standard formatting.'}
 
-3. SHORT, RELEVANT HASHTAGS (SMALL, SENSIBLE SET):
-   - Generate a small, sensible set of 5-8 short, relevant hashtags directly related to the actual uploaded content (e.g., for an academic services image about SPSS, Excel data analysis, and PowerPoint presentations: #SPSS #DataAnalysis #Excel #PowerPoint #AcademicResearch).
-   - DO NOT generate long sentence-like hashtags such as #SPSSDataAnalysisAzeemAcademicHubPresentationSupport.
-   - DO NOT generate generic viral fillers such as #ShopOnline, #MustHaves, #ForYouPage, #TrendingNow, #ExplorePage, #ViralFinds, #LifestyleUpgrade.
-   - DO NOT include application names (#AEZEY, #AEZEYAIStudio) or formula names (#AIDA, #IDAP, #PAS, #EAS, #BAB, #Formula).
-   - Each hashtag MUST be concise (max 18 characters) and searchable.
-
-4. RELEVANT KEYWORDS & SEO-FRIENDLY URL SLUG STRICTLY ON MEDIA TOPIC:
-   - Generate high-intent SEO keywords that strictly describe the actual subject, product, or service shown (e.g. 'spss data analysis service', 'excel statistical modeling', 'powerpoint presentation design', 'academic research data analysis').
-   - Do NOT use unrelated trendy keywords or the application name.
-   - Generate a clean, readable, lowercase, hyphen-separated SEO slug based strictly on the uploaded topic (e.g., "spss-data-analysis-excel-presentation-services", "cushioned-running-shoes", "authentic-gourmet-cooking-recipe").
-
-5. ADHERE TO USER SPECIAL INSTRUCTIONS STRICTLY AS FORMATTING & REQUIREMENTS:
-   - The Special Instructions field is optional.
-   - If the user provides instructions such as "Highlight my services in bullet points" or "keep my services in bullet points", format the actual services shown in the media as clean bullet points (• Service 1\\n• Service 2).
-   - If the user provides "Include my WhatsApp number", ONLY include it if provided in the text or visible in the media. NEVER invent a phone number.
-   - If the user provides "Write in simple English", use simple, clear, conversational vocabulary.
-   - If the user provides "Focus on my main service", emphasize the primary offering shown in the media.
-   - NEVER copy, quote, echo, or print the instruction text itself into the caption (e.g. do NOT write "Highlight my services in bullet points:" in the caption).
-   - If the field is empty, generate content normally without requiring additional instructions.
-${formula && formula !== 'standard' ? `
-6. PERSUASIVE COPYWRITING FORMULA DIRECTIVE (${formula}):
-The user explicitly requested the "${formula}" copywriting formula. Craft the copy following this formula's persuasive psychological progression while strictly adhering to:
-- NO HEADINGS, LABELS, OR STRUCTURAL TAGS: Write the entire caption as a natural, human-like paragraph (or bullet points if requested by special instructions) WITHOUT ANY headings, labels, section titles, or structural tags. NEVER output words like "Attention:", "Interest:", "Desire:", "Action:", "Problem:", "Agitate:", "Solution:", "Before:", "After:", "Bridge:", or any brackets/markdown tags like "**Attention:**" or "[Problem]".
-- NATURAL, HUMAN-LIKE WRITING: Blend the phases seamlessly into flowing, conversational prose.
-- STRICT USER FORMATTING COMPLIANCE: If the user specified bullet points or list format, integrate the product/service features smoothly in bullet points while applying the ${formula} arc.
-
-${formula === 'AIDA' ? `
-AIDA ARC (PRODUCT/SERVICE REFLECTION, CASUAL & NATURAL TONE, DIRECT AUDIENCE ATTRACTION):
-- Identify the exact product, service, dish, apparel, or offering in the media and center the entire caption around it.
-- Directly attract the target audience with a casual, magnetic opening that speaks to their lifestyle or everyday needs.
-- Walk through Attention -> Interest -> Desire -> Action naturally with zero formula labels.
-` : formula === 'PAS' ? `
-PAS ARC (Apply naturally without ANY headings or labels):
-- Open by identifying a relatable, genuine problem or frustration your audience faces.
-- Empathize and agitate why putting up with this frustration is exhausting.
-- Unveil the subject in the media as the clear, natural solution and close with an enticing CTA.
-` : `
-BAB ARC (Apply naturally without ANY headings or labels):
-- Open with the relatable baseline reality or struggle before discovering this solution.
-- Illustrate the vivid, inspiring picture of life and success after the breakthrough.
-- Show how the subject or service in the media directly bridges the gap to get there, with a clear CTA.
-`}
-` : ''}
-
-BRAND & TEXT RECOGNITION:
-- DO NOT invent or assume any brand name. Only output a brand if it is clearly visible in the uploaded media. If none is visible, set detectedBrand to null.
-- Accurately transcribe visible phone numbers, URLs, addresses, prices, and offers if present.
 ${payload.mediaInspection?.visibleText && payload.mediaInspection.visibleText.length > 0 ? `
-CLIENT CANVAS & VISUAL INSPECTION EVIDENCE:
-- Visible Text Identified:
+VISUAL EVIDENCE & OCR SIGNALS:
+- Visible Text Identified in Media:
 ${payload.mediaInspection.visibleText.map((t: string) => `  * ${t}`).join('\n')}
 ${payload.mediaInspection.detectedBrand ? `- Brand Logo / Heading: ${payload.mediaInspection.detectedBrand}` : ''}
 ${payload.mediaInspection.contactInfo?.phone ? `- Phone Number Shown: ${payload.mediaInspection.contactInfo.phone}` : ''}
 ${payload.mediaInspection.contactInfo?.website ? `- Website Shown: ${payload.mediaInspection.contactInfo.website}` : ''}
 ${payload.mediaInspection.contactInfo?.offers ? `- Pricing/Offers Shown: ${payload.mediaInspection.contactInfo.offers}` : ''}
 ` : ''}
-LANGUAGE & FORMATTING OBJECTIVES:
-- Target Platform: ${platform}
-- Selected Tone: ${tone}
-- Primary Language: Detect English, Urdu script, or Mixed Roman Urdu/English matching the tone and culture.
-${customInstructions ? `- User Special Formatting & Stylistic Instructions: "${customInstructions}" (STRICT PRIORITY: Obey and apply this exact formatting/stylistic directive seamlessly with the selected formula; do NOT repeat this prompt string in the caption text).` : ''}
 
 Respond ONLY with valid JSON matching the schema provided.
 `;
