@@ -1,9 +1,9 @@
-import { analyzeContent, MediaAnalysisPayload } from '../../src/services/analyzer';
+import { analyzeContent, resolveApiKey, MediaAnalysisPayload } from '../../src/services/analyzer';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
+  'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-goog-api-key',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -14,25 +14,39 @@ export async function onRequestOptions() {
   });
 }
 
-export async function onRequestPost(context: { request: Request; env: Record<string, string> }) {
-  const { request, env } = context;
-  const apiKey =
-    env.GEMINI_API_KEY ||
-    (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined);
+export async function onRequestPost(contextOrRequest: any, maybeEnv?: any) {
+  let request: Request;
+  let env: any;
 
-  if (!apiKey) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error:
-          'GEMINI_API_KEY is not configured on Cloudflare. Please set GEMINI_API_KEY in Cloudflare Pages Settings -> Environment variables.',
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-      }
-    );
+  if (contextOrRequest && contextOrRequest.request && typeof contextOrRequest.request.json === 'function') {
+    request = contextOrRequest.request;
+    env = contextOrRequest.env || contextOrRequest.data?.env || contextOrRequest.cloudflare?.env || contextOrRequest;
+  } else if (contextOrRequest instanceof Request || (contextOrRequest && typeof contextOrRequest.json === 'function')) {
+    request = contextOrRequest;
+    env = maybeEnv || (contextOrRequest as any).env;
+  } else {
+    request = contextOrRequest?.request || contextOrRequest;
+    env = contextOrRequest?.env || maybeEnv || contextOrRequest;
   }
+
+  // Resolve API key from all available environments
+  const envApiKey =
+    resolveApiKey(undefined, env) ||
+    resolveApiKey(undefined, contextOrRequest) ||
+    resolveApiKey(undefined, maybeEnv);
+
+  if (envApiKey && typeof process !== 'undefined' && process.env) {
+    process.env.GEMINI_API_KEY = envApiKey;
+  }
+  if (envApiKey && typeof globalThis !== 'undefined') {
+    (globalThis as any).GEMINI_API_KEY = envApiKey;
+  }
+
+  const headerKey =
+    request.headers?.get?.('x-goog-api-key') ||
+    (request.headers?.get?.('Authorization')
+      ? request.headers.get('Authorization')!.replace(/^Bearer\s+/i, '')
+      : undefined);
 
   let payload: MediaAnalysisPayload;
   try {
@@ -50,8 +64,13 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     );
   }
 
+  const clientKey = payload?.apiKey || headerKey;
+  const activeKey =
+    resolveApiKey(clientKey || envApiKey, env) ||
+    resolveApiKey(clientKey, contextOrRequest);
+
   try {
-    const result = await analyzeContent(payload, apiKey);
+    const result = await analyzeContent(payload, activeKey, env || contextOrRequest);
     return new Response(
       JSON.stringify({
         success: true,
@@ -76,11 +95,18 @@ export async function onRequestPost(context: { request: Request; env: Record<str
   }
 }
 
-export async function onRequest(context: { request: Request }) {
+export async function onRequest(contextOrRequest: any, maybeEnv?: any) {
+  const req = contextOrRequest?.request || contextOrRequest;
+  if (req?.method === 'POST') {
+    return onRequestPost(contextOrRequest, maybeEnv);
+  }
+  if (req?.method === 'OPTIONS') {
+    return onRequestOptions();
+  }
   return new Response(
     JSON.stringify({
       success: false,
-      error: `Method ${context.request.method} Not Allowed. /api/analyze accepts POST requests only.`,
+      error: `Method ${req?.method || 'UNKNOWN'} Not Allowed. /api/analyze accepts POST requests only.`,
       allowedMethods: ['POST', 'OPTIONS'],
     }),
     {

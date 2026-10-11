@@ -9,6 +9,25 @@ export type ContentTone = 'engaging' | 'professional' | 'promotional' | 'storyte
 
 export type TargetPlatform = 'all' | 'instagram' | 'linkedin' | 'facebook' | 'tiktok' | 'twitter';
 
+export type MarketingFormula = 'standard' | 'AIDA' | 'PAS' | 'BAB';
+
+export interface MediaInspectionData {
+  visibleText?: string[];
+  detectedBrand?: string | null;
+  servicesOrProducts?: string[];
+  contactInfo?: {
+    phone?: string;
+    email?: string;
+    website?: string;
+    prices?: string;
+    offers?: string;
+  };
+  colorPalette?: string[];
+  aspectRatio?: string;
+  orientation?: 'portrait' | 'landscape' | 'square';
+  sceneHighlights?: string[];
+}
+
 export interface AnalysisRequest {
   mediaType: MediaType;
   mimeType: string;
@@ -19,7 +38,9 @@ export interface AnalysisRequest {
   duration?: number; // In seconds for videos
   platform?: TargetPlatform;
   tone?: ContentTone;
+  formula?: MarketingFormula;
   customInstructions?: string;
+  mediaInspection?: MediaInspectionData;
 }
 
 export interface HashtagGroup {
@@ -66,6 +87,7 @@ export interface AnalysisResult {
   timestamp: number;
   primaryCaption: string;
   alternativeCaption: string;
+  urlSlug?: string;
   hashtags: HashtagGroup;
   seoKeywords: SeoKeywordGroup;
   callToAction: string;
@@ -73,6 +95,9 @@ export interface AnalysisResult {
   detectedContext: DetectedContext;
   platform?: TargetPlatform;
   tone?: ContentTone;
+  formula?: MarketingFormula;
+  isSimulatedFallback?: boolean;
+  authNotice?: string;
 }
 
 export interface ApiResponse<T = any> {

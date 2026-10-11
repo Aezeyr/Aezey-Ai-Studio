@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Sparkles,
   ArrowRight,
@@ -8,18 +8,36 @@ import {
   Layers,
   Flame,
   Globe,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { AezeyLogo } from './components/AezeyLogo';
 import { MediaUploader } from './components/MediaUploader';
 import { ResultsDisplay } from './components/ResultsDisplay';
 import { FeaturesShowcase } from './components/FeaturesShowcase';
-import { AnalysisResult, MediaType, TargetPlatform, ContentTone } from './types';
+import {
+  AnalysisResult,
+  MediaType,
+  TargetPlatform,
+  ContentTone,
+  MarketingFormula,
+  MediaInspectionData,
+} from './types';
 
 export default function App() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Clear any legacy client-side stored keys to ensure API keys are never stored in browser
+  useEffect(() => {
+    try {
+      localStorage.removeItem('aezey_custom_api_key');
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Cached last request payload for 1-click regeneration
   const [lastPayload, setLastPayload] = useState<any | null>(null);
@@ -40,27 +58,38 @@ export default function App() {
     duration?: number;
     platform: TargetPlatform;
     tone: ContentTone;
+    formula?: MarketingFormula;
     customInstructions?: string;
+    mediaInspection?: MediaInspectionData;
   }) => {
     setIsAnalyzing(true);
     setErrorMessage(null);
     setLastPayload(payload);
 
-    setAnalysisStep('Initiating multi-modal visual inspection...');
+    setAnalysisStep('Analyzing uploaded media: inspecting visual content & frames...');
 
     try {
-      // Step simulation for responsive feedback
+      const startTime = Date.now();
+
       const stepTimer1 = setTimeout(() => {
-        setAnalysisStep('Scanning for dynamic brand, visible text, and logos...');
-      }, 1200);
+        setAnalysisStep('Scanning visual content: reading visible text, headings, and branding...');
+      }, 700);
 
       const stepTimer2 = setTimeout(() => {
-        setAnalysisStep('Detecting language, pricing, contact details, and offers...');
-      }, 2600);
+        setAnalysisStep('Identifying subject, products, services, and target audience from media...');
+      }, 1500);
 
       const stepTimer3 = setTimeout(() => {
-        setAnalysisStep('Synthesizing captions, hashtags, SEO keywords, and CTAs...');
-      }, 4200);
+        setAnalysisStep('Understanding marketing purpose & applying copywriting formula...');
+      }, 2300);
+
+      const stepTimer4 = setTimeout(() => {
+        setAnalysisStep('Generating human-sounding caption, relevant hashtags & SEO keywords...');
+      }, 3000);
+
+      const stepTimer5 = setTimeout(() => {
+        setAnalysisStep('Building SEO-friendly URL slug & finalizing result...');
+      }, 3600);
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -70,9 +99,17 @@ export default function App() {
         body: JSON.stringify(payload),
       });
 
+      // Ensure user experiences the complete multi-stage analysis sequence (minimum 3.4s pacing)
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 3400) {
+        await new Promise((r) => setTimeout(r, 3400 - elapsed));
+      }
+
       clearTimeout(stepTimer1);
       clearTimeout(stepTimer2);
       clearTimeout(stepTimer3);
+      clearTimeout(stepTimer4);
+      clearTimeout(stepTimer5);
 
       const contentType = response.headers.get('content-type') || '';
       let data: any = null;
@@ -105,7 +142,7 @@ export default function App() {
         });
       }, 300);
     } catch (err: any) {
-      console.error('Analysis error:', err);
+      // Handled gracefully via state display
       setErrorMessage(
         err?.message ||
           'Connection error or analysis timeout. Please ensure the server has network access and retry.'
@@ -119,6 +156,15 @@ export default function App() {
   const handleRegenerate = () => {
     if (lastPayload) {
       handleStartAnalysis(lastPayload);
+    }
+  };
+
+  const handleSelectFormula = (selectedFormula: MarketingFormula) => {
+    if (lastPayload) {
+      handleStartAnalysis({
+        ...lastPayload,
+        formula: selectedFormula,
+      });
     }
   };
 
@@ -251,9 +297,73 @@ export default function App() {
 
           {/* Error Display */}
           {errorMessage && (
-            <div className="mt-6 p-4 rounded-xl bg-red-950/70 border border-red-500/40 text-red-200">
-              <p className="font-bold text-sm">Processing Failed</p>
-              <p className="text-xs mt-1 text-red-300">{errorMessage}</p>
+            <div className="mt-6 p-5 sm:p-6 rounded-2xl bg-gradient-to-b from-red-950/90 to-slate-900/90 border border-red-500/50 text-red-200 shadow-2xl shadow-red-950/40">
+              <div className="flex items-start gap-3.5">
+                <div className="p-2.5 rounded-xl bg-red-900/60 border border-red-500/40 text-red-400 shrink-0 mt-0.5 shadow-md">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div className="space-y-3 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-red-500/20">
+                    <div>
+                      <p className="font-bold text-base text-red-100 flex items-center gap-2">
+                        <span>Gemini API Authentication Notice</span>
+                        <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-red-900/80 text-red-300 border border-red-500/30">
+                          401 UNAUTHENTICATED
+                        </span>
+                      </p>
+                      <p className="text-xs text-red-300/80 mt-0.5">
+                        Google Cloud rejected the request because the API key needs Generative Language API enablement or restrictions adjustment.
+                      </p>
+                    </div>
+
+                    {lastPayload && !isAnalyzing && (
+                      <button
+                        onClick={() => handleStartAnalysis(lastPayload)}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white transition-all shadow-lg shadow-red-950/50 border border-red-400/40 cursor-pointer"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Retry Analysis</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                    <div className="p-3 rounded-xl bg-slate-900/80 border border-red-500/20 text-xs">
+                      <div className="flex items-center gap-1.5 font-semibold text-red-200 mb-1">
+                        <span className="w-4 h-4 rounded-full bg-red-800 text-red-200 flex items-center justify-center text-[10px] font-bold">1</span>
+                        <span>Enable API in Cloud</span>
+                      </div>
+                      <p className="text-slate-300 text-[11px] leading-relaxed">
+                        In Google Cloud Console &rarr; <strong>APIs & Services</strong> &rarr; <strong>Library</strong>: search and enable <strong>Generative Language API</strong>.
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-900/80 border border-red-500/20 text-xs">
+                      <div className="flex items-center gap-1.5 font-semibold text-red-200 mb-1">
+                        <span className="w-4 h-4 rounded-full bg-red-800 text-red-200 flex items-center justify-center text-[10px] font-bold">2</span>
+                        <span>Key Restrictions</span>
+                      </div>
+                      <p className="text-slate-300 text-[11px] leading-relaxed">
+                        In <strong>Credentials</strong> &rarr; your API key: ensure <strong>API restrictions</strong> explicitly permits <em>Generative Language API</em> (or set to Don't restrict).
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-900/80 border border-red-500/20 text-xs">
+                      <div className="flex items-center gap-1.5 font-semibold text-red-200 mb-1">
+                        <span className="w-4 h-4 rounded-full bg-red-800 text-red-200 flex items-center justify-center text-[10px] font-bold">3</span>
+                        <span>Or Use AI Studio Key</span>
+                      </div>
+                      <p className="text-slate-300 text-[11px] leading-relaxed">
+                        Create a dedicated key at <strong>aistudio.google.com</strong> and save it in project secrets as <code>GEMINI_API_KEY</code>.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 text-[11px] text-red-300/70 border-t border-red-500/10">
+                    <p className="font-mono break-all">{errorMessage}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -263,6 +373,7 @@ export default function App() {
               result={result}
               onRegenerate={handleRegenerate}
               onClear={handleClearResults}
+              onSelectFormula={handleSelectFormula}
               isRegenerating={isAnalyzing}
             />
           )}

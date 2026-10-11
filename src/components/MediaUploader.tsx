@@ -17,12 +17,15 @@ import {
   MediaType,
   TargetPlatform,
   ContentTone,
+  MarketingFormula,
+  MediaInspectionData,
 } from '../types';
 import {
   validateImageFile,
   validateVideoFile,
   extractVideoKeyframes,
   optimizeImageForAnalysis,
+  inspectMediaCanvas,
   fileToBase64,
   formatBytes,
   formatDuration,
@@ -41,7 +44,9 @@ interface MediaUploaderProps {
     duration?: number;
     platform: TargetPlatform;
     tone: ContentTone;
+    formula?: MarketingFormula;
     customInstructions?: string;
+    mediaInspection?: MediaInspectionData;
   }) => void;
   isAnalyzing: boolean;
 }
@@ -57,10 +62,12 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   const [duration, setDuration] = useState<number | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [activePreset, setActivePreset] = useState<SamplePreset | null>(null);
 
   // Settings
   const [platform, setPlatform] = useState<TargetPlatform>('all');
   const [tone, setTone] = useState<ContentTone>('engaging');
+  const [formula, setFormula] = useState<MarketingFormula>('standard');
   const [customInstructions, setCustomInstructions] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -95,7 +102,8 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
 
   const processSelectedFile = async (selectedFile: File) => {
     setError(null);
-    setIsValidating(true);
+    setIsValidating(false);
+    setActivePreset(null);
 
     const isVideo =
       selectedFile.type.startsWith('video/') ||
@@ -138,6 +146,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     setPreviewUrl(null);
     setDuration(undefined);
     setError(null);
+    setActivePreset(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -148,28 +157,52 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
     const dataUrl = preset.generateDataUrl();
     setPreviewUrl(dataUrl);
     setMediaType('image');
+    setActivePreset(preset);
     setFile(
       new File([new Blob()], `${preset.id}-sample.jpg`, { type: 'image/jpeg' })
     );
     setError(null);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmitWithFormula = async (selectedFormula?: MarketingFormula) => {
+    const activeFormula = selectedFormula !== undefined ? selectedFormula : formula;
+    if (selectedFormula !== undefined) {
+      setFormula(selectedFormula);
+    }
+
     if (!previewUrl && !file) {
-      setError('Please select or drag in an image or video first.');
+      setError(
+        selectedFormula && selectedFormula !== 'standard'
+          ? `Please select or drag in an image or video first, then click ${selectedFormula} to generate.`
+          : 'Please select or drag in an image or video first.'
+      );
       return;
     }
 
     try {
       let base64Data = '';
       let videoFrames: string[] = [];
+      let mediaInspection: MediaInspectionData | undefined;
+
+      if (activePreset) {
+        mediaInspection = {
+          visibleText: activePreset.visibleText || [],
+          detectedBrand: activePreset.brandExpected || null,
+          servicesOrProducts: activePreset.servicesOrProducts || [],
+          contactInfo: activePreset.contactInfo,
+        };
+      } else if (file && file.size > 0) {
+        mediaInspection = await inspectMediaCanvas(file, mediaType === 'video');
+      }
 
       if (file && file.size > 0) {
         if (mediaType === 'video') {
-          // Extract keyframes for reliable visual multi-frame comprehension
-          videoFrames = await extractVideoKeyframes(file, 5);
-          // Only send full raw video base64 if keyframe extraction was not possible
-          if (!videoFrames || videoFrames.length === 0) {
+          // Extract keyframes for reliable visual multi-frame comprehension (beginning, middle, end)
+          videoFrames = await extractVideoKeyframes(file, 6);
+          // Set first frame as representative base64 thumbnail if not already present
+          if (videoFrames.length > 0) {
+            base64Data = videoFrames[0];
+          } else {
             base64Data = await fileToBase64(file);
           }
         } else {
@@ -179,21 +212,38 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
         base64Data = previewUrl;
       }
 
+      const resolvedMimeType =
+        mediaType === 'video'
+          ? file?.type || 'video/mp4'
+          : base64Data.startsWith('data:image/png')
+          ? 'image/png'
+          : base64Data.startsWith('data:image/webp')
+          ? 'image/webp'
+          : base64Data.startsWith('data:image/jpeg')
+          ? 'image/jpeg'
+          : file?.type || 'image/jpeg';
+
       onStartAnalysis({
         mediaType,
-        mimeType: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+        mimeType: resolvedMimeType,
         base64Data,
         videoFrames: videoFrames.length > 0 ? videoFrames : undefined,
-        fileName: file?.name || 'media-sample.jpg',
+        fileName: file?.name || (activePreset ? `${activePreset.id}-sample.jpg` : 'media-sample.jpg'),
         fileSize: file?.size || base64Data.length * 0.75,
         duration,
         platform,
         tone,
+        formula: activeFormula !== 'standard' ? activeFormula : undefined,
         customInstructions: customInstructions.trim() || undefined,
+        mediaInspection,
       });
     } catch (err: any) {
       setError(err?.message || 'Error preparing media for analysis. Please try again.');
     }
+  };
+
+  const handleSubmit = () => {
+    handleSubmitWithFormula(formula);
   };
 
   return (
@@ -408,7 +458,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2.5">
             {SAMPLE_PRESETS.map((preset) => (
               <button
                 key={preset.id}
@@ -486,21 +536,126 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
               Special Instructions (Optional)
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Highlight free delivery, discount code..."
+            <textarea
+              rows={2}
               value={customInstructions}
               onChange={(e) => setCustomInstructions(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-400 transition-colors resize-none"
             />
           </div>
         </div>
       )}
 
+      {/* Marketing Copy Formulas Feature: AIDA, PAS, BAB Buttons */}
+      <div className="mt-6 p-4 rounded-xl bg-slate-950/70 border border-slate-800">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+              Marketing Formulas (1-Click Generate)
+            </h3>
+            {formula !== 'standard' && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800/60">
+                Selected: {formula}
+              </span>
+            )}
+          </div>
+          <span className="text-[11px] text-slate-400">
+            Click any button to generate caption & hashtags strictly following that formula
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* AIDA Formula Button */}
+          <button
+            type="button"
+            onClick={() => handleSubmitWithFormula('AIDA')}
+            disabled={isAnalyzing}
+            className={`p-3.5 rounded-xl border text-left transition-all duration-200 group cursor-pointer ${
+              formula === 'AIDA'
+                ? 'bg-cyan-950/90 border-cyan-400 text-white shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-400'
+                : 'bg-slate-900/90 hover:bg-slate-800/90 border-slate-700/80 hover:border-cyan-500/50 text-slate-200'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                AIDA
+              </span>
+              <span className="text-[10px] uppercase font-semibold text-cyan-400 px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800/50">
+                Formula
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1.5 leading-snug">
+              Attention • Interest • Desire • Action
+            </p>
+            <span className="text-[11px] font-semibold text-cyan-400 mt-2.5 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              Generate with AIDA →
+            </span>
+          </button>
+
+          {/* PAS Formula Button */}
+          <button
+            type="button"
+            onClick={() => handleSubmitWithFormula('PAS')}
+            disabled={isAnalyzing}
+            className={`p-3.5 rounded-xl border text-left transition-all duration-200 group cursor-pointer ${
+              formula === 'PAS'
+                ? 'bg-amber-950/90 border-amber-400 text-white shadow-lg shadow-amber-500/20 ring-1 ring-amber-400'
+                : 'bg-slate-900/90 hover:bg-slate-800/90 border-slate-700/80 hover:border-amber-500/50 text-slate-200'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                PAS
+              </span>
+              <span className="text-[10px] uppercase font-semibold text-amber-400 px-2 py-0.5 rounded bg-amber-950 border border-amber-800/50">
+                Formula
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1.5 leading-snug">
+              Problem • Agitate • Solution
+            </p>
+            <span className="text-[11px] font-semibold text-amber-400 mt-2.5 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              Generate with PAS →
+            </span>
+          </button>
+
+          {/* BAB Formula Button */}
+          <button
+            type="button"
+            onClick={() => handleSubmitWithFormula('BAB')}
+            disabled={isAnalyzing}
+            className={`p-3.5 rounded-xl border text-left transition-all duration-200 group cursor-pointer ${
+              formula === 'BAB'
+                ? 'bg-purple-950/90 border-purple-400 text-white shadow-lg shadow-purple-500/20 ring-1 ring-purple-400'
+                : 'bg-slate-900/90 hover:bg-slate-800/90 border-slate-700/80 hover:border-purple-500/50 text-slate-200'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-white group-hover:text-purple-300 transition-colors flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-purple-400" />
+                BAB
+              </span>
+              <span className="text-[10px] uppercase font-semibold text-purple-400 px-2 py-0.5 rounded bg-purple-950 border border-purple-800/50">
+                Formula
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1.5 leading-snug">
+              Before • After • Bridge
+            </p>
+            <span className="text-[11px] font-semibold text-purple-400 mt-2.5 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              Generate with BAB →
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* Main CTA Button */}
       <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-800">
         <p className="text-xs text-slate-400">
-          Powered by <strong className="text-slate-300">Gemini 3.8 Flash</strong>. Media is
+          Powered by <strong className="text-slate-300">Gemini 2.5 Flash</strong>. Media is
           processed on server and never permanently stored.
         </p>
 

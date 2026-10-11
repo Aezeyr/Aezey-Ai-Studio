@@ -38,9 +38,9 @@ export const FeaturesShowcase: React.FC = () => {
     },
     {
       icon: <TrendingUp className="w-6 h-6 text-amber-400" />,
-      title: 'Categorized Social Hashtags',
+      title: 'SEO URL Slugs & Targeted Hashtags',
       description:
-        'Organized into Industry, Niche, Topic, and Audience tags for optimal algorithm distribution on Instagram, TikTok, Facebook, and LinkedIn.',
+        'Generates clean kebab-case URL slugs (e.g. digital-marketing-tips) based strictly on your uploaded media topic, with targeted hashtags free of app branding.',
     },
     {
       icon: <ShieldCheck className="w-6 h-6 text-cyan-300" />,
